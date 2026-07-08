@@ -60,6 +60,8 @@ Render settings when creating the service manually:
 
 Required production environment variables are documented in `docs/render-deployment.md`. For Neon, set `DATABASE_URL` in Render rather than separate `DB_HOST`, `DB_DATABASE`, `DB_USERNAME`, and `DB_PASSWORD` values.
 
+Developer dashboard links, local testing commands, and deployment utilities are collected in `docs/developer-resources.md`.
+
 ## Milestone 0 Acceptance
 
 Feature development should not continue until these are verified:
