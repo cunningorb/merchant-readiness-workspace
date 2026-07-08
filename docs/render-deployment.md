@@ -23,6 +23,8 @@ Set these in Render after creating the web service:
 - `DB_CONNECTION=pgsql`
 - `DATABASE_URL=...`
 
+Use the Neon unpooled connection string for `DATABASE_URL` while Render runs Laravel migrations during startup. The pooled URL is better for normal application traffic later, but it can fail during migration DDL.
+
 Generate `APP_KEY` with a Laravel environment before deploying production traffic:
 
 ```bash

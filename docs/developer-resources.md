@@ -78,7 +78,7 @@ Required Render environment variables:
 - `APP_KEY=base64:...`
 - `APP_URL=https://commerce-cartographer.onrender.com`
 - `DB_CONNECTION=pgsql`
-- `DATABASE_URL=<Neon pooled connection string>`
+- `DATABASE_URL=<Neon unpooled connection string>`
 - `LOG_CHANNEL=stderr`
 
 Recommended Render environment variables:
@@ -93,6 +93,8 @@ Deployment checks:
 - Homepage loads.
 - `/health` returns `{"status":"ok"}`.
 - Startup migrations run successfully against Neon.
+
+Use Neon's unpooled URL for Render while the container runs `php artisan migrate --force` at startup. The pooled URL can fail during migrations because it goes through PgBouncer.
 
 ## Useful Commands
 
