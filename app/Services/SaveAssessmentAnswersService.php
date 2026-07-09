@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Assessment;
+use App\Models\AssessmentAnswer;
 
 class SaveAssessmentAnswersService
 {
@@ -12,17 +13,24 @@ class SaveAssessmentAnswersService
 
     public function save(Assessment $assessment, array $answers): Assessment
     {
-        foreach ($answers as $answer) {
-            $question = $this->catalog->question($answer['question_key']);
+        $now = now();
 
-            $assessment->answers()->updateOrCreate(
-                ['question_key' => $answer['question_key']],
-                [
+        AssessmentAnswer::upsert(
+            collect($answers)->map(function (array $answer) use ($assessment, $now): array {
+                $question = $this->catalog->question($answer['question_key']);
+
+                return [
+                    'assessment_id' => $assessment->id,
+                    'question_key' => $answer['question_key'],
                     'section' => $question['section'],
-                    'value' => $answer['value'],
-                ],
-            );
-        }
+                    'value' => json_encode($answer['value'], JSON_THROW_ON_ERROR),
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ];
+            })->all(),
+            ['assessment_id', 'question_key'],
+            ['section', 'value', 'updated_at'],
+        );
 
         $this->syncMerchantIdentity($assessment, $answers);
 
@@ -32,10 +40,14 @@ class SaveAssessmentAnswersService
     private function syncMerchantIdentity(Assessment $assessment, array $answers): void
     {
         $values = collect($answers)->pluck('value', 'question_key');
+        $merchantAttributes = $this->catalog->questions()
+            ->filter(fn (array $question): bool => isset($question['merchant_field']))
+            ->mapWithKeys(fn (array $question): array => [$question['merchant_field'] => $values->get($question['key'])])
+            ->filter(fn ($value): bool => is_string($value) && $value !== '')
+            ->all();
 
-        $assessment->merchant->fill([
-            'company_name' => $values->get('business.company_name', $assessment->merchant->company_name),
-            'contact_email' => $values->get('business.contact_email', $assessment->merchant->contact_email),
-        ])->save();
+        if ($merchantAttributes !== []) {
+            $assessment->merchant->fill($merchantAttributes)->save();
+        }
     }
 }

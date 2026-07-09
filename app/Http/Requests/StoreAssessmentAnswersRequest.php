@@ -40,22 +40,65 @@ class StoreAssessmentAnswersRequest extends FormRequest
                     $validator->errors()->add("answers.$index.value", 'This question is required.');
                 }
 
-                if (($question['type'] ?? null) === 'email' && $value !== null && ! filter_var($value, FILTER_VALIDATE_EMAIL)) {
-                    $validator->errors()->add("answers.$index.value", 'This answer must be a valid email address.');
+                if ($value === null) {
+                    $validator->errors()->add("answers.$index.value", 'This answer cannot be empty.');
+                    continue;
                 }
 
-                if (($question['type'] ?? null) === 'multiselect' && ! is_array($value)) {
-                    $validator->errors()->add("answers.$index.value", 'This answer must be a list.');
-                }
-
-                if (($question['type'] ?? null) === 'boolean' && ! is_bool($value)) {
-                    $validator->errors()->add("answers.$index.value", 'This answer must be true or false.');
-                }
-
-                if (isset($question['options']) && is_string($value) && ! in_array($value, $question['options'], true)) {
-                    $validator->errors()->add("answers.$index.value", 'This answer is not one of the allowed options.');
-                }
+                match ($question['type'] ?? null) {
+                    'text' => $this->validateStringAnswer($validator, $index, $value),
+                    'email' => $this->validateEmailAnswer($validator, $index, $value),
+                    'select' => $this->validateSelectAnswer($validator, $index, $value, $question['options'] ?? []),
+                    'multiselect' => $this->validateMultiselectAnswer($validator, $index, $value, $question['options'] ?? []),
+                    'boolean' => $this->validateBooleanAnswer($validator, $index, $value),
+                    default => null,
+                };
             }
         });
+    }
+
+    private function validateStringAnswer($validator, int $index, mixed $value): void
+    {
+        if (! is_string($value)) {
+            $validator->errors()->add("answers.$index.value", 'This answer must be text.');
+        }
+    }
+
+    private function validateEmailAnswer($validator, int $index, mixed $value): void
+    {
+        if (! is_string($value) || ! filter_var($value, FILTER_VALIDATE_EMAIL)) {
+            $validator->errors()->add("answers.$index.value", 'This answer must be a valid email address.');
+        }
+    }
+
+    private function validateSelectAnswer($validator, int $index, mixed $value, array $options): void
+    {
+        if (! is_string($value) || ! in_array($value, $options, true)) {
+            $validator->errors()->add("answers.$index.value", 'This answer is not one of the allowed options.');
+        }
+    }
+
+    private function validateMultiselectAnswer($validator, int $index, mixed $value, array $options): void
+    {
+        if (! is_array($value)) {
+            $validator->errors()->add("answers.$index.value", 'This answer must be a list.');
+
+            return;
+        }
+
+        foreach ($value as $option) {
+            if (! is_string($option) || ! in_array($option, $options, true)) {
+                $validator->errors()->add("answers.$index.value", 'This answer contains an option that is not allowed.');
+
+                return;
+            }
+        }
+    }
+
+    private function validateBooleanAnswer($validator, int $index, mixed $value): void
+    {
+        if (! is_bool($value)) {
+            $validator->errors()->add("answers.$index.value", 'This answer must be true or false.');
+        }
     }
 }

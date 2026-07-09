@@ -1,6 +1,6 @@
 <script setup>
 import axios from 'axios';
-import { computed, ref } from 'vue';
+import { computed, ref, watchEffect } from 'vue';
 
 const props = defineProps({
     catalog: {
@@ -17,6 +17,22 @@ const errors = ref({});
 
 const currentSection = computed(() => props.catalog[currentSectionIndex.value]);
 const isLastSection = computed(() => currentSectionIndex.value === props.catalog.length - 1);
+
+watchEffect(() => {
+    props.catalog.forEach((section) => {
+        section.questions.forEach((question) => {
+            if (question.type === 'multiselect' && !Array.isArray(answers.value[question.key])) {
+                answers.value[question.key] = [];
+            }
+        });
+    });
+});
+
+function questionError(index) {
+    return errors.value[`answers.${index}.value`]?.[0]
+        ?? errors.value[`answers.${index}.question_key`]?.[0]
+        ?? null;
+}
 
 async function startAssessment() {
     if (assessmentId.value) {
@@ -95,7 +111,7 @@ function previousSection() {
                 </div>
 
                 <div class="space-y-6">
-                    <label v-for="question in currentSection.questions" :key="question.key" class="block">
+                    <label v-for="(question, questionIndex) in currentSection.questions" :key="question.key" class="block">
                         <span class="mb-2 block text-sm font-medium text-slate-100">
                             {{ question.label }}
                             <span v-if="question.required" class="text-blue-200">*</span>
@@ -134,8 +150,8 @@ function previousSection() {
                             <option :value="false">No</option>
                         </select>
 
-                        <p v-if="Object.keys(errors).some((key) => key.includes(question.key) || key.includes('value'))" class="mt-2 text-sm text-red-300">
-                            This answer needs attention.
+                        <p v-if="questionError(questionIndex)" class="mt-2 text-sm text-red-300">
+                            {{ questionError(questionIndex) }}
                         </p>
                     </label>
                 </div>

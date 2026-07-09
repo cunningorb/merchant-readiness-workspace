@@ -89,4 +89,52 @@ class PublicAssessmentWizardTest extends TestCase
             ],
         ])->assertUnprocessable();
     }
+
+    public function test_multiselect_answers_must_only_contain_allowed_options(): void
+    {
+        $assessment = Assessment::factory()->create();
+
+        $this->postJson("/api/assessments/{$assessment->id}/answers", [
+            'answers' => [
+                ['question_key' => 'catalog.fit_sensitive_categories', 'value' => ['Not A Real Option']],
+            ],
+        ])->assertUnprocessable();
+    }
+
+    public function test_multiselect_answers_accept_allowed_option_lists(): void
+    {
+        $assessment = Assessment::factory()->create();
+
+        $this->postJson("/api/assessments/{$assessment->id}/answers", [
+            'answers' => [
+                ['question_key' => 'catalog.fit_sensitive_categories', 'value' => ['Apparel', 'Footwear']],
+            ],
+        ])->assertOk();
+
+        $this->assertSame(['Apparel', 'Footwear'], AssessmentAnswer::first()->value);
+    }
+
+    public function test_select_answers_must_be_strings_from_allowed_options(): void
+    {
+        $assessment = Assessment::factory()->create();
+
+        $this->postJson("/api/assessments/{$assessment->id}/answers", [
+            'answers' => [
+                ['question_key' => 'business.monthly_order_volume', 'value' => true],
+            ],
+        ])->assertUnprocessable();
+    }
+
+    public function test_null_answers_are_rejected_before_database_write(): void
+    {
+        $assessment = Assessment::factory()->create();
+
+        $this->postJson("/api/assessments/{$assessment->id}/answers", [
+            'answers' => [
+                ['question_key' => 'catalog.fit_sensitive_categories', 'value' => null],
+            ],
+        ])->assertUnprocessable();
+
+        $this->assertDatabaseCount('assessment_answers', 0);
+    }
 }

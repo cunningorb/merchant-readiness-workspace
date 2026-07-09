@@ -13,8 +13,8 @@ class AssessmentQuestionCatalog
                 'key' => 'business',
                 'label' => 'Business',
                 'questions' => [
-                    ['key' => 'business.company_name', 'label' => 'Company name', 'type' => 'text', 'required' => true],
-                    ['key' => 'business.contact_email', 'label' => 'Work email', 'type' => 'email', 'required' => true],
+                    ['key' => 'business.company_name', 'label' => 'Company name', 'type' => 'text', 'required' => true, 'merchant_field' => 'company_name'],
+                    ['key' => 'business.contact_email', 'label' => 'Work email', 'type' => 'email', 'required' => true, 'merchant_field' => 'contact_email'],
                     ['key' => 'business.monthly_order_volume', 'label' => 'Monthly order volume', 'type' => 'select', 'required' => true, 'options' => ['Under 1,000', '1,000-10,000', '10,001-50,000', '50,000+']],
                 ],
             ],
