@@ -20,6 +20,9 @@ class Assessment extends Model
         'status',
         'started_at',
         'submitted_at',
+        'overall_score',
+        'overall_tier',
+        'section_scores',
     ];
 
     protected function casts(): array
@@ -27,6 +30,7 @@ class Assessment extends Model
         return [
             'started_at' => 'datetime',
             'submitted_at' => 'datetime',
+            'section_scores' => 'array',
         ];
     }
 

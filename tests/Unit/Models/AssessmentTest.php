@@ -55,4 +55,25 @@ class AssessmentTest extends TestCase
 
         $this->assertNull($assessment->answerValue('return_policy.window_days'));
     }
+
+    public function test_score_fields_are_nullable_and_section_scores_casts_to_array(): void
+    {
+        $assessment = Assessment::factory()->create();
+
+        $this->assertNull($assessment->overall_score);
+        $this->assertNull($assessment->overall_tier);
+        $this->assertNull($assessment->section_scores);
+
+        $assessment->forceFill([
+            'overall_score' => 72,
+            'overall_tier' => 'Established',
+            'section_scores' => ['return_policy' => ['score' => 80, 'tier' => 'Established']],
+        ])->save();
+
+        $fresh = $assessment->fresh();
+        $this->assertSame(72, $fresh->overall_score);
+        $this->assertSame('Established', $fresh->overall_tier);
+        $this->assertIsArray($fresh->section_scores);
+        $this->assertSame(80, $fresh->section_scores['return_policy']['score']);
+    }
 }
