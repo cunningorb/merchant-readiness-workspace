@@ -22,6 +22,15 @@ class AppServiceProvider extends ServiceProvider
         });
 
         $this->app->bind(\App\Contracts\AssessmentScorer::class, \App\Services\ReadinessScoringService::class);
+
+        $this->app->singleton(\App\Services\RecommendationEngine::class, function ($app) {
+            $rules = array_map(
+                fn (string $class) => $app->make($class),
+                config('recommendations.rules'),
+            );
+
+            return new \App\Services\RecommendationEngine($rules);
+        });
     }
 
     /**
