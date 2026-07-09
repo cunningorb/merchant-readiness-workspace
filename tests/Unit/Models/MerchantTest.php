@@ -2,6 +2,7 @@
 
 namespace Tests\Unit\Models;
 
+use App\Models\Assessment;
 use App\Models\Merchant;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -35,5 +36,14 @@ class MerchantTest extends TestCase
         $this->assertNull($merchant->fresh()->contact_name);
         $this->assertNull($merchant->fresh()->contact_email);
         $this->assertNull($merchant->fresh()->website);
+    }
+
+    public function test_merchant_has_many_assessments(): void
+    {
+        $merchant = Merchant::factory()->create();
+        $assessments = Assessment::factory()->count(2)->for($merchant)->create();
+
+        $this->assertCount(2, $merchant->fresh()->assessments);
+        $this->assertTrue($merchant->assessments->contains($assessments->first()));
     }
 }
