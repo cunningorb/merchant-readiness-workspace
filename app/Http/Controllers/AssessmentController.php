@@ -7,6 +7,7 @@ use App\Models\Assessment;
 use App\Services\AssessmentQuestionCatalog;
 use App\Services\CreateAssessmentService;
 use App\Services\SaveAssessmentAnswersService;
+use App\Services\SubmitAssessmentService;
 use Illuminate\Http\JsonResponse;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -45,6 +46,28 @@ class AssessmentController extends Controller
                 'status' => $assessment->status,
                 'answers_count' => $assessment->answers->count(),
             ],
+        ]);
+    }
+
+    public function submit(Assessment $assessment, SubmitAssessmentService $service): JsonResponse
+    {
+        $assessment = $service->submit($assessment);
+
+        return response()->json([
+            'assessment' => [
+                'id' => $assessment->id,
+                'status' => $assessment->status,
+                'overall_score' => $assessment->overall_score,
+                'overall_tier' => $assessment->overall_tier,
+                'section_scores' => $assessment->section_scores,
+            ],
+            'recommendations' => $assessment->recommendations->map(fn ($recommendation) => [
+                'title' => $recommendation->title,
+                'description' => $recommendation->description,
+                'category' => $recommendation->category,
+                'priority' => $recommendation->priority,
+                'expected_impact' => $recommendation->expected_impact,
+            ]),
         ]);
     }
 }

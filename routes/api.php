@@ -5,3 +5,4 @@ use Illuminate\Support\Facades\Route;
 
 Route::post('/assessments', [AssessmentController::class, 'store']);
 Route::post('/assessments/{assessment}/answers', [AssessmentController::class, 'answers']);
+Route::post('/assessments/{assessment}/submit', [AssessmentController::class, 'submit']);
