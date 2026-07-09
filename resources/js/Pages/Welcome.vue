@@ -20,6 +20,9 @@ defineProps({
                 <p class="mt-6 max-w-2xl text-lg leading-8 text-slate-300">
                     {{ appName }} will help ecommerce merchants assess operational maturity, understand scoring, and share actionable recommendations before a sales conversation.
                 </p>
+                <a href="/assessment" class="mt-8 inline-flex rounded-xl bg-blue-500 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-950/40 transition hover:bg-blue-400">
+                    Start assessment
+                </a>
             </div>
 
             <div class="mt-12 grid gap-4 sm:grid-cols-3">
