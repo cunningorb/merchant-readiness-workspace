@@ -1,6 +1,6 @@
 <script setup>
 import axios from 'axios';
-import { computed, ref, watchEffect } from 'vue';
+import { computed, ref, watch, watchEffect } from 'vue';
 
 const props = defineProps({
     catalog: {
@@ -33,6 +33,10 @@ function questionError(index) {
         ?? errors.value[`answers.${index}.question_key`]?.[0]
         ?? null;
 }
+
+watch(currentSectionIndex, () => {
+    errors.value = {};
+});
 
 async function startAssessment() {
     if (assessmentId.value) {
