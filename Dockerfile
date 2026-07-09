@@ -1,20 +1,4 @@
-FROM node:22-bookworm AS assets
-
-WORKDIR /app
-
-COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
-COPY composer.json composer.lock ./
-RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader --no-scripts
-
-COPY package.json package-lock.json ./
-RUN npm ci
-
-COPY resources ./resources
-COPY public ./public
-COPY vite.config.js ./
-RUN npm run build
-
-FROM php:8.3-cli
+FROM php:8.3-cli AS php-base
 
 RUN apt-get update && apt-get install -y \
     git \
@@ -28,12 +12,32 @@ RUN apt-get update && apt-get install -y \
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
+FROM php-base AS php-deps
+
 WORKDIR /var/www/html
 
-COPY composer.json ./
+COPY composer.json composer.lock ./
 RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader --no-scripts
 
+FROM node:22-bookworm AS assets
+
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+RUN npm ci
+
+COPY resources ./resources
+COPY public ./public
+COPY vite.config.js ./
+COPY --from=php-deps /var/www/html/vendor ./vendor
+RUN npm run build
+
+FROM php-base
+
+WORKDIR /var/www/html
+
 COPY . .
+COPY --from=php-deps /var/www/html/vendor ./vendor
 COPY --from=assets /app/public/build ./public/build
 
 RUN composer dump-autoload --optimize \
