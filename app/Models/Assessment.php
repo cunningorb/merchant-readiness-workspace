@@ -38,4 +38,9 @@ class Assessment extends Model
     {
         return $this->hasMany(AssessmentAnswer::class);
     }
+
+    public function recommendations(): HasMany
+    {
+        return $this->hasMany(Recommendation::class);
+    }
 }
