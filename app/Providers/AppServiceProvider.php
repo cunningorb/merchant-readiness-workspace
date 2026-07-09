@@ -12,7 +12,16 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->singleton(\App\Services\ReadinessScoringService::class, function ($app) {
+            $scorers = array_map(
+                fn (string $class) => $app->make($class),
+                config('scoring.scorers'),
+            );
+
+            return new \App\Services\ReadinessScoringService($scorers);
+        });
+
+        $this->app->bind(\App\Contracts\AssessmentScorer::class, \App\Services\ReadinessScoringService::class);
     }
 
     /**

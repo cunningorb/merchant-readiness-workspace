@@ -40,6 +40,11 @@ class Assessment extends Model
         return $this->hasMany(AssessmentAnswer::class);
     }
 
+    public function answerValue(string $questionKey): mixed
+    {
+        return $this->answers->firstWhere('question_key', $questionKey)?->value;
+    }
+
     public function recommendations(): HasMany
     {
         return $this->hasMany(Recommendation::class);

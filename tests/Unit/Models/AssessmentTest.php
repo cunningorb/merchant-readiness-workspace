@@ -36,4 +36,23 @@ class AssessmentTest extends TestCase
 
         $this->assertSame('draft', $assessment->status);
     }
+
+    public function test_answer_value_returns_stored_value_for_question_key(): void
+    {
+        $assessment = Assessment::factory()->create();
+        \App\Models\AssessmentAnswer::factory()->for($assessment)->create([
+            'question_key' => 'return_policy.window_days',
+            'section' => 'return_policy',
+            'value' => '31-60 days',
+        ]);
+
+        $this->assertSame('31-60 days', $assessment->answerValue('return_policy.window_days'));
+    }
+
+    public function test_answer_value_returns_null_when_question_unanswered(): void
+    {
+        $assessment = Assessment::factory()->create();
+
+        $this->assertNull($assessment->answerValue('return_policy.window_days'));
+    }
 }
