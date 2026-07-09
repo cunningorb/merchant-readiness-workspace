@@ -28,21 +28,34 @@ Out of scope (deferred to Milestone 4 - Results dashboard):
 
 Only questions with a genuine maturity ordering feed the score. `business.*` and `catalog.*` questions, and `platform.ecommerce_platform`, are excluded entirely from scoring — they remain in the wizard unchanged, used only for merchant profile data and recommendation personalization text. There is no zero-weight placeholder for them; they simply aren't part of the scoring model.
 
-### Per-question point mapping (0-100 per question)
+### Per-question scoring: one class per question
 
-| Question | Mapping |
-|---|---|
-| `return_policy.window_days` | 14 days or less=0, 15-30 days=33, 31-60 days=67, More than 60 days=100 |
-| `return_policy.policy_clarity` | Not documented=0, Basic FAQ=33, Detailed policy page=67, Contextual by product/order=100 |
-| `manual_operations.weekly_hours` | 50+=0, 21-50=33, 5-20=67, Under 5=100 (fewer hours = more mature) |
-| `manual_operations.common_bottlenecks` (multiselect, optional, 5 options) | `100 - (selected_count / 5) * 100` (more bottlenecks reported = lower score; empty selection = 100) |
-| `exchanges.offered` (boolean) | Yes=100, No=0 |
-| `exchanges.incentives` (multiselect, optional, 4 options) | `(selected_count / 4) * 100` (more incentives offered = higher score; empty selection = 0) |
-| `platform.return_tools` | Email/spreadsheets=0, Helpdesk workflow=33, Returns app=67, Custom automation=100 |
+Each scored question gets its own small class implementing a `QuestionScorer` contract, in its own file under `app/Services/Scoring/Questions/`. No shared switch/match statement — adding or changing a question's scoring logic means touching exactly one file.
+
+```php
+interface QuestionScorer
+{
+    public function questionKey(): string;
+    public function section(): string;
+    public function score(mixed $value): int; // 0-100
+}
+```
+
+`ReadinessScoringService` holds a registered list of `QuestionScorer` instances (bound via `config/scoring.php`, listing scorer class names — same registration pattern as `RecommendationRule`, for consistency). It groups their outputs by `section()`, averages within each section, then applies the section weight map to compute the overall score. It contains no per-question mapping logic itself — only aggregation.
+
+| Question | Class | Mapping |
+|---|---|---|
+| `return_policy.window_days` | `ReturnWindowScorer` | 14 days or less=0, 15-30 days=33, 31-60 days=67, More than 60 days=100 |
+| `return_policy.policy_clarity` | `PolicyClarityScorer` | Not documented=0, Basic FAQ=33, Detailed policy page=67, Contextual by product/order=100 |
+| `manual_operations.weekly_hours` | `WeeklyHoursScorer` | 50+=0, 21-50=33, 5-20=67, Under 5=100 (fewer hours = more mature) |
+| `manual_operations.common_bottlenecks` (multiselect, optional, 5 options) | `CommonBottlenecksScorer` | `100 - (selected_count / 5) * 100` (more bottlenecks reported = lower score; empty selection = 100) |
+| `exchanges.offered` (boolean) | `ExchangesOfferedScorer` | Yes=100, No=0 |
+| `exchanges.incentives` (multiselect, optional, 4 options) | `ExchangeIncentivesScorer` | `(selected_count / 4) * 100` (more incentives offered = higher score; empty selection = 0) |
+| `platform.return_tools` | `ReturnToolsScorer` | Email/spreadsheets=0, Helpdesk workflow=33, Returns app=67, Custom automation=100 |
 
 ### Section scores and weights
 
-Section score = average of its scorable questions' points.
+Section score = average of its scorable questions' points (from their `QuestionScorer::score()` output).
 
 | Section | Scored question(s) | Weight |
 |---|---|---|
@@ -84,6 +97,8 @@ interface RecommendationRule
     public function draft(Assessment $assessment, ScoreBreakdown $scores): RecommendationDraft;
 }
 ```
+
+(See "Per-question scoring" above for the `QuestionScorer` contract that `AssessmentScorer`'s implementation composes.)
 
 `ScoreBreakdown` and `RecommendationDraft` are plain value objects (not Eloquent models):
 - `ScoreBreakdown`: overall score, overall tier, and a per-section map of `{score, tier}`.
@@ -136,6 +151,6 @@ On the last wizard section, after a successful `saveSection()`, show a "Submit a
 
 ## Testing plan
 
-- `ReadinessScoringServiceTest` (unit): point mapping and weighting math against known answer sets; edge cases for empty multiselects; overall rounding.
+- One test per `QuestionScorer` class (mapping correctness, edge cases for empty multiselects), plus a `ReadinessScoringServiceTest` covering section averaging, weighting math, and overall rounding.
 - One test per recommendation rule, plus a `RecommendationEngineTest` covering aggregation and priority sorting.
 - `AssessmentSubmissionTest` (feature): happy path (correct score + expected recommendations persisted to DB); incomplete assessment rejected with 422 and correct missing-field errors; already-submitted assessment rejected with 409.
