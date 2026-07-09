@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\AssessmentController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -14,6 +15,8 @@ Route::get('/health', function () {
         'service' => 'merchant-readiness-workspace',
     ]);
 });
+
+Route::get('/assessment', [AssessmentController::class, 'wizard'])->name('assessment.wizard');
 
 Route::get('/dashboard', function () {
     return Inertia::render('Dashboard');
