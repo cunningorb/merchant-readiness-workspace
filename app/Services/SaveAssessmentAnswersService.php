@@ -13,6 +13,10 @@ class SaveAssessmentAnswersService
 
     public function save(Assessment $assessment, array $answers): Assessment
     {
+        if ($assessment->status === 'submitted') {
+            abort(409, 'This assessment has already been submitted and cannot be edited.');
+        }
+
         $now = now();
 
         AssessmentAnswer::upsert(

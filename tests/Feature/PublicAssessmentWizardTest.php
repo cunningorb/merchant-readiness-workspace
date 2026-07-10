@@ -137,4 +137,17 @@ class PublicAssessmentWizardTest extends TestCase
 
         $this->assertDatabaseCount('assessment_answers', 0);
     }
+
+    public function test_submitted_assessments_reject_further_answer_edits(): void
+    {
+        $assessment = Assessment::factory()->create(['status' => 'submitted']);
+
+        $this->postJson("/api/assessments/{$assessment->id}/answers", [
+            'answers' => [
+                ['question_key' => 'business.company_name', 'value' => 'Northwind Supply'],
+            ],
+        ])->assertStatus(409);
+
+        $this->assertDatabaseCount('assessment_answers', 0);
+    }
 }
