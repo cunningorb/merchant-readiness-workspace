@@ -180,7 +180,7 @@ async function submitAssessment() {
 
                             <div v-else-if="question.type === 'multiselect'" class="grid gap-2 sm:grid-cols-2">
                                 <label v-for="option in question.options" :key="option" class="flex items-center gap-3 rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-700">
-                                    <input v-model="answers[question.key]" type="checkbox" :value="option" class="rounded border-slate-300 bg-white text-blue-600">
+                                    <input v-model="answers[question.key]" type="checkbox" :value="option" class="rounded border-slate-300 text-blue-600">
                                     {{ option }}
                                 </label>
                             </div>
