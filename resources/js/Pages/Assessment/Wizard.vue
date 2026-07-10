@@ -128,7 +128,7 @@ async function submitAssessment() {
                 </p>
                 <h1 class="text-4xl font-bold tracking-tight sm:text-5xl">Evaluate your returns operation.</h1>
                 <p class="mt-5 text-lg leading-8 text-slate-300">
-                    Complete each section to save a draft assessment. Scoring and recommendations come in the next milestone.
+                    Complete each section to save a draft assessment, then submit to see your readiness score, breakdown, and recommendations.
                 </p>
             </div>
 
