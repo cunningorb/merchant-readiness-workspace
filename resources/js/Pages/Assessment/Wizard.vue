@@ -31,9 +31,26 @@ watchEffect(() => {
 });
 
 function questionError(index) {
+    const question = currentSection.value.questions[index];
     return errors.value[`answers.${index}.value`]?.[0]
         ?? errors.value[`answers.${index}.question_key`]?.[0]
+        ?? errors.value[question.key]?.[0]
         ?? null;
+}
+
+function missingSectionLabels() {
+    const keys = Object.keys(errors.value);
+    const labels = [];
+
+    props.catalog.forEach((section) => {
+        const hasMissingQuestion = section.questions.some((question) => keys.includes(question.key));
+
+        if (hasMissingQuestion) {
+            labels.push(section.label);
+        }
+    });
+
+    return labels;
 }
 
 watch(currentSectionIndex, () => {
@@ -91,7 +108,11 @@ async function submitAssessment() {
             submitError.value = 'This assessment has already been submitted.';
         } else {
             errors.value = error.response?.data?.errors ?? {};
-            submitError.value = 'Check the highlighted answers before submitting.';
+
+            const sections = missingSectionLabels();
+            submitError.value = sections.length
+                ? `Missing required answers in: ${sections.join(', ')}.`
+                : 'Check the highlighted answers before submitting.';
         }
     }
 }
