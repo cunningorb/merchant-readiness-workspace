@@ -83,5 +83,9 @@ function printReport() {
         background: white !important;
         border-color: #d1d5db !important;
     }
+
+    svg text {
+        fill: black !important;
+    }
 }
 </style>
