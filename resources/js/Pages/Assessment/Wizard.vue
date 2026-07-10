@@ -224,7 +224,7 @@ async function submitAssessment() {
                 <p v-if="submitError" class="mt-3 text-right text-sm text-red-300">{{ submitError }}</p>
             </template>
 
-            <AssessmentResults v-if="submitResult" :result="submitResult" :catalog="catalog" />
+            <AssessmentResults v-if="submitResult" :result="submitResult" :catalog="catalog" :report-url="submitResult.report.url" />
         </section>
     </main>
 </template>

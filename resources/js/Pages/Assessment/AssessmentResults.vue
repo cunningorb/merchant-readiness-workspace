@@ -10,6 +10,10 @@ const props = defineProps({
         type: Array,
         required: true,
     },
+    reportUrl: {
+        type: String,
+        default: null,
+    },
 });
 
 const RING_RADIUS = 52;
@@ -77,6 +81,11 @@ const recommendations = computed(() => props.result.recommendations ?? []);
                     {{ overallTier }}
                 </span>
             </div>
+        </div>
+
+        <div v-if="reportUrl" class="rounded-2xl border border-blue-400/30 bg-blue-500/10 p-4 text-sm text-blue-100">
+            Your shareable report:
+            <a :href="reportUrl" class="font-semibold underline decoration-blue-300/60 underline-offset-2 hover:text-white">{{ reportUrl }}</a>
         </div>
 
         <div>
