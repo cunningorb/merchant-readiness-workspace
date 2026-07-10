@@ -19,7 +19,7 @@ class ReportAccessTest extends TestCase
             'section_scores' => ['return_policy' => ['score' => 72, 'tier' => 'Established']],
         ]);
 
-        return Report::factory()->for($assessment)->create();
+        return Report::factory()->for($assessment)->create(['published_at' => now()]);
     }
 
     public function test_api_report_endpoint_returns_expected_payload_for_valid_token(): void
@@ -53,6 +53,26 @@ class ReportAccessTest extends TestCase
     public function test_web_report_page_404s_for_unknown_token(): void
     {
         $response = $this->get('/reports/does-not-exist');
+
+        $response->assertNotFound();
+    }
+
+    public function test_api_report_endpoint_404s_for_unpublished_report(): void
+    {
+        $assessment = Assessment::factory()->create();
+        $report = Report::factory()->for($assessment)->create(['published_at' => null]);
+
+        $response = $this->getJson("/api/reports/{$report->token}");
+
+        $response->assertNotFound();
+    }
+
+    public function test_web_report_page_404s_for_unpublished_report(): void
+    {
+        $assessment = Assessment::factory()->create();
+        $report = Report::factory()->for($assessment)->create(['published_at' => null]);
+
+        $response = $this->get("/reports/{$report->token}");
 
         $response->assertNotFound();
     }
