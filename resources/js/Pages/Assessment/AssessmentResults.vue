@@ -36,6 +36,18 @@ function sectionLabel(key) {
 }
 
 const rankedSections = computed(() => Object.entries(props.result.assessment.ranked_sections));
+
+const PRIORITY_COLORS = {
+    high: 'border-rose-400/40 bg-rose-500/20 text-rose-200',
+    medium: 'border-amber-400/40 bg-amber-500/20 text-amber-200',
+    low: 'border-slate-400/40 bg-slate-500/20 text-slate-200',
+};
+
+function priorityClasses(priority) {
+    return PRIORITY_COLORS[priority] ?? PRIORITY_COLORS.low;
+}
+
+const recommendations = computed(() => props.result.recommendations ?? []);
 </script>
 
 <template>
@@ -94,6 +106,26 @@ const rankedSections = computed(() => Object.entries(props.result.assessment.ran
                 >
                     <p class="text-sm font-medium">{{ sectionLabel(key) }}</p>
                     <p class="mt-1 text-xs uppercase tracking-wide">{{ section.tier }}</p>
+                </div>
+            </div>
+        </div>
+
+        <div>
+            <h3 class="text-lg font-semibold text-white">Recommended actions</h3>
+            <p v-if="recommendations.length === 0" class="mt-4 text-sm text-emerald-300">
+                No urgent opportunities identified — nice work.
+            </p>
+            <div v-else class="mt-4 grid gap-4 sm:grid-cols-2">
+                <div v-for="(recommendation, index) in recommendations" :key="index" class="rounded-2xl border border-white/10 p-4">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs uppercase tracking-wide text-blue-200">{{ recommendation.category }}</span>
+                        <span class="rounded-full border px-2 py-0.5 text-xs font-medium" :class="priorityClasses(recommendation.priority)">
+                            {{ recommendation.priority }}
+                        </span>
+                    </div>
+                    <h4 class="mt-2 font-semibold text-white">{{ recommendation.title }}</h4>
+                    <p class="mt-1 text-sm text-slate-300">{{ recommendation.description }}</p>
+                    <p class="mt-2 text-sm text-slate-400">Expected impact: {{ recommendation.expected_impact }}</p>
                 </div>
             </div>
         </div>
