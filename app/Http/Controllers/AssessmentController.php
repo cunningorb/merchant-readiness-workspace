@@ -69,6 +69,10 @@ class AssessmentController extends Controller
                 'priority' => $recommendation->priority,
                 'expected_impact' => $recommendation->expected_impact,
             ]),
+            'report' => [
+                'token' => $assessment->report->token,
+                'url' => route('reports.show', $assessment->report->token),
+            ],
         ]);
     }
 }

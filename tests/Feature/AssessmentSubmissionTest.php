@@ -63,6 +63,11 @@ class AssessmentSubmissionTest extends TestCase
         $this->assertSame(0, $rankedSections[$rankedKeys[2]]['score']);
         $this->assertSame('manual_operations', $rankedKeys[3]);
         $this->assertSame(30, $rankedSections['manual_operations']['score']);
+
+        $this->assertDatabaseCount('reports', 1);
+        $reportToken = $response->json('report.token');
+        $this->assertNotEmpty($reportToken);
+        $this->assertSame(route('reports.show', $reportToken), $response->json('report.url'));
     }
 
     public function test_submitting_an_incomplete_assessment_is_rejected(): void

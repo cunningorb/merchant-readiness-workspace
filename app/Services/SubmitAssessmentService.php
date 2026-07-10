@@ -13,6 +13,7 @@ class SubmitAssessmentService
         private readonly AssessmentQuestionCatalog $catalog,
         private readonly AssessmentScorer $scorer,
         private readonly RecommendationEngine $recommendations,
+        private readonly ReportBuilderService $reports,
     ) {
     }
 
@@ -55,9 +56,11 @@ class SubmitAssessmentService
                 'status' => 'submitted',
                 'submitted_at' => now(),
             ])->save();
+
+            $this->reports->createForAssessment($assessment);
         });
 
-        return $assessment->fresh(['answers', 'recommendations']);
+        return $assessment->fresh(['answers', 'recommendations', 'report']);
     }
 
     private function isAnswered(Assessment $assessment, string $questionKey): bool
