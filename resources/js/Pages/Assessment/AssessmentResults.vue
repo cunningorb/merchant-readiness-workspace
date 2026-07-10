@@ -29,6 +29,13 @@ function tierColors(tier) {
 const overallScore = computed(() => props.result.assessment.overall_score);
 const overallTier = computed(() => props.result.assessment.overall_tier);
 const ringOffset = computed(() => RING_CIRCUMFERENCE * (1 - overallScore.value / 100));
+
+function sectionLabel(key) {
+    const section = props.catalog.find((candidate) => candidate.key === key);
+    return section ? section.label : key;
+}
+
+const rankedSections = computed(() => Object.entries(props.result.assessment.ranked_sections));
 </script>
 
 <template>
@@ -58,6 +65,22 @@ const ringOffset = computed(() => RING_CIRCUMFERENCE * (1 - overallScore.value /
                     {{ overallTier }}
                 </span>
             </div>
+        </div>
+
+        <div>
+            <h3 class="text-lg font-semibold text-white">Score breakdown</h3>
+            <p class="mt-1 text-sm text-slate-400">Ranked by opportunity — weakest area first.</p>
+            <ul class="mt-4 space-y-3">
+                <li v-for="[key, section] in rankedSections" :key="key">
+                    <div class="flex items-center justify-between text-sm">
+                        <span class="font-medium text-slate-100">{{ sectionLabel(key) }}</span>
+                        <span class="text-slate-300">{{ section.score }}/100</span>
+                    </div>
+                    <div class="mt-1 h-2 w-full overflow-hidden rounded-full bg-white/10">
+                        <div class="h-full rounded-full" :class="tierColors(section.tier).bar" :style="{ width: `${section.score}%` }" />
+                    </div>
+                </li>
+            </ul>
         </div>
     </div>
 </template>
