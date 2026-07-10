@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\AssessmentController;
+use App\Http\Controllers\ReportController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -17,6 +18,8 @@ Route::get('/health', function () {
 });
 
 Route::get('/assessment', [AssessmentController::class, 'wizard'])->name('assessment.wizard');
+
+Route::get('/reports/{report:token}', [ReportController::class, 'show'])->name('reports.show');
 
 Route::get('/dashboard', function () {
     return Inertia::render('Dashboard');
