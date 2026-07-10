@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Contracts\AssessmentScorer;
 use App\Models\Assessment;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class SubmitAssessmentService
@@ -36,23 +37,25 @@ class SubmitAssessmentService
 
         $scores = $this->scorer->score($assessment);
 
-        $this->recommendations->generate($assessment, $scores)->each(
-            fn ($draft) => $assessment->recommendations()->create([
-                'title' => $draft->title,
-                'description' => $draft->description,
-                'category' => $draft->category,
-                'priority' => $draft->priority,
-                'expected_impact' => $draft->expectedImpact,
-            ])
-        );
+        DB::transaction(function () use ($assessment, $scores) {
+            $this->recommendations->generate($assessment, $scores)->each(
+                fn ($draft) => $assessment->recommendations()->create([
+                    'title' => $draft->title,
+                    'description' => $draft->description,
+                    'category' => $draft->category,
+                    'priority' => $draft->priority,
+                    'expected_impact' => $draft->expectedImpact,
+                ])
+            );
 
-        $assessment->forceFill([
-            'overall_score' => $scores->overallScore,
-            'overall_tier' => $scores->overallTier,
-            'section_scores' => $scores->sections,
-            'status' => 'submitted',
-            'submitted_at' => now(),
-        ])->save();
+            $assessment->forceFill([
+                'overall_score' => $scores->overallScore,
+                'overall_tier' => $scores->overallTier,
+                'section_scores' => $scores->sections,
+                'status' => 'submitted',
+                'submitted_at' => now(),
+            ])->save();
+        });
 
         return $assessment->fresh(['answers', 'recommendations']);
     }
