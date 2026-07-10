@@ -60,6 +60,7 @@ class AssessmentController extends Controller
                 'overall_score' => $assessment->overall_score,
                 'overall_tier' => $assessment->overall_tier,
                 'section_scores' => $assessment->section_scores,
+                'ranked_sections' => collect($assessment->section_scores)->sortBy('score')->all(),
             ],
             'recommendations' => $assessment->recommendations->map(fn ($recommendation) => [
                 'title' => $recommendation->title,

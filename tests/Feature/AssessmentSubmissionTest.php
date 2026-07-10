@@ -54,6 +54,15 @@ class AssessmentSubmissionTest extends TestCase
         $response->assertJsonCount(6, 'recommendations');
         $this->assertDatabaseHas('assessments', ['id' => $assessment->id, 'status' => 'submitted']);
         $this->assertDatabaseCount('recommendations', 6);
+
+        $rankedSections = $response->json('assessment.ranked_sections');
+        $rankedKeys = array_keys($rankedSections);
+
+        $this->assertSame(0, $rankedSections[$rankedKeys[0]]['score']);
+        $this->assertSame(0, $rankedSections[$rankedKeys[1]]['score']);
+        $this->assertSame(0, $rankedSections[$rankedKeys[2]]['score']);
+        $this->assertSame('manual_operations', $rankedKeys[3]);
+        $this->assertSame(30, $rankedSections['manual_operations']['score']);
     }
 
     public function test_submitting_an_incomplete_assessment_is_rejected(): void
