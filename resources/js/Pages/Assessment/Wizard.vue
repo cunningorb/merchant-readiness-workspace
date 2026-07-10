@@ -1,6 +1,7 @@
 <script setup>
 import axios from 'axios';
 import { computed, ref, watch, watchEffect } from 'vue';
+import AssessmentResults from './AssessmentResults.vue';
 
 const props = defineProps({
     catalog: {
@@ -221,25 +222,7 @@ async function submitAssessment() {
 
             <p v-if="submitError" class="mt-3 text-right text-sm text-red-300">{{ submitError }}</p>
 
-            <div v-if="submitResult" class="mt-8 rounded-3xl border border-white/10 bg-white/5 p-6">
-                <h2 class="text-xl font-semibold">Assessment submitted</h2>
-                <p class="mt-2 text-slate-200">
-                    Overall score: {{ submitResult.assessment.overall_score }}/100 ({{ submitResult.assessment.overall_tier }})
-                </p>
-                <ul class="mt-4 space-y-1 text-sm text-slate-300">
-                    <li v-for="(section, key) in submitResult.assessment.section_scores" :key="key">
-                        {{ key }}: {{ section.score }}/100 ({{ section.tier }})
-                    </li>
-                </ul>
-                <div class="mt-6 space-y-4">
-                    <div v-for="(recommendation, index) in submitResult.recommendations" :key="index" class="rounded-2xl border border-white/10 p-4">
-                        <p class="text-xs uppercase tracking-wide text-blue-200">{{ recommendation.category }} - {{ recommendation.priority }}</p>
-                        <h3 class="mt-1 font-semibold">{{ recommendation.title }}</h3>
-                        <p class="mt-1 text-sm text-slate-300">{{ recommendation.description }}</p>
-                        <p class="mt-2 text-sm text-slate-400">Expected impact: {{ recommendation.expected_impact }}</p>
-                    </div>
-                </div>
-            </div>
+            <AssessmentResults v-if="submitResult" :result="submitResult" :catalog="catalog" />
         </section>
     </main>
 </template>
