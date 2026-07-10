@@ -46,20 +46,20 @@ function printReport() {
 </script>
 
 <template>
-    <main class="min-h-screen bg-slate-950 px-6 py-10 text-white sm:px-8">
+    <main class="min-h-screen bg-slate-50 px-6 py-10 text-slate-900 sm:px-8">
         <section class="mx-auto max-w-5xl">
             <div class="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
                 <div>
-                    <p class="mb-2 inline-flex rounded-full border border-blue-300/30 bg-blue-400/10 px-4 py-2 text-sm font-medium text-blue-100">
+                    <p class="mb-2 inline-flex rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700">
                         Merchant Readiness Report
                     </p>
                     <h1 class="text-3xl font-bold tracking-tight sm:text-4xl">{{ report.merchant.company_name }}</h1>
-                    <p v-if="profileLine" class="mt-2 text-slate-400">{{ profileLine }}</p>
+                    <p v-if="profileLine" class="mt-2 text-slate-500">{{ profileLine }}</p>
                     <p class="mt-1 text-sm text-slate-500">Prepared on {{ preparedOn }}</p>
                 </div>
                 <button
                     type="button"
-                    class="print:hidden rounded-xl border border-white/10 px-5 py-3 text-sm font-semibold text-slate-200 transition hover:bg-white/5"
+                    class="print:hidden rounded-xl border border-slate-300 px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
                     @click="printReport"
                 >
                     Print report
@@ -70,22 +70,3 @@ function printReport() {
         </section>
     </main>
 </template>
-
-<style>
-@media print {
-    body {
-        background: white !important;
-        color: black !important;
-    }
-
-    * {
-        color: black !important;
-        background: white !important;
-        border-color: #d1d5db !important;
-    }
-
-    svg text {
-        fill: black !important;
-    }
-}
-</style>
