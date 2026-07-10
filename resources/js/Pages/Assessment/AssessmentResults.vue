@@ -82,5 +82,20 @@ const rankedSections = computed(() => Object.entries(props.result.assessment.ran
                 </li>
             </ul>
         </div>
+
+        <div>
+            <h3 class="text-lg font-semibold text-white">Capability mapping</h3>
+            <div class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <div
+                    v-for="[key, section] in rankedSections"
+                    :key="key"
+                    class="rounded-2xl border px-4 py-3 text-center"
+                    :class="tierColors(section.tier).pill"
+                >
+                    <p class="text-sm font-medium">{{ sectionLabel(key) }}</p>
+                    <p class="mt-1 text-xs uppercase tracking-wide">{{ section.tier }}</p>
+                </div>
+            </div>
+        </div>
     </div>
 </template>
