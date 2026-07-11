@@ -22,4 +22,17 @@ class PublicAccessTest extends TestCase
 
         $response->assertRedirect('/login');
     }
+
+    public function test_forwarded_https_requests_generate_https_urls(): void
+    {
+        $response = $this->withServerVariables([
+            'HTTP_HOST' => 'commerce-cartographer.onrender.com',
+            'HTTP_X_FORWARDED_PROTO' => 'https',
+            'HTTP_X_FORWARDED_HOST' => 'commerce-cartographer.onrender.com',
+        ])->get('/login');
+
+        $response->assertOk();
+        $this->assertTrue($response->baseRequest->isSecure());
+        $this->assertSame('https://commerce-cartographer.onrender.com', $response->baseRequest->root());
+    }
 }
