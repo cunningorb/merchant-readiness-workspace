@@ -13,8 +13,7 @@ final readonly class OpportunityEvidence
         public array $inputs,
         public array $sourceAnswerKeys,
         public array $why,
-    ) {
-    }
+    ) {}
 
     /**
      * @return array{inputs: array<string, mixed>, source_answer_keys: array<int, string>, why: array<int, string>}
