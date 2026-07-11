@@ -25,6 +25,7 @@ const isMounted = ref(false);
 let debounceTimer = null;
 let savePromise = null;
 let pendingSectionIndex = null;
+let startPromise = null;
 
 const currentSection = computed(() => props.catalog[currentSectionIndex.value]);
 const isLastSection = computed(() => currentSectionIndex.value === props.catalog.length - 1);
@@ -83,8 +84,13 @@ async function startAssessment() {
         return;
     }
 
-    const response = await axios.post('/api/assessments');
-    assessmentId.value = response.data.assessment.id;
+    if (!startPromise) {
+        startPromise = axios.post('/api/assessments').then((response) => {
+            assessmentId.value = response.data.assessment.id;
+        });
+    }
+
+    await startPromise;
 }
 
 function queueSave() {
@@ -101,7 +107,7 @@ function flushSaveImmediately() {
 }
 
 function runSave() {
-    if (savePromise) {
+    if (savePromise || pendingSectionIndex === null) {
         return;
     }
 
