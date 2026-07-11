@@ -2,16 +2,11 @@
 
 namespace Database\Seeders;
 
-use App\Models\Assessment;
-use App\Models\Merchant;
 use App\Models\User;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
 class DatabaseSeeder extends Seeder
 {
-    use WithoutModelEvents;
-
     /**
      * Seed the application's database.
      */
@@ -24,9 +19,6 @@ class DatabaseSeeder extends Seeder
             ]);
         }
 
-        if (! Merchant::query()->exists()) {
-            $merchant = Merchant::factory()->create();
-            Assessment::factory()->for($merchant)->create();
-        }
+        $this->call(DemoMerchantsSeeder::class);
     }
 }

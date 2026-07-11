@@ -13,13 +13,13 @@ class DatabaseSeederTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_database_seeder_creates_an_admin_user_and_a_sample_assessment(): void
+    public function test_database_seeder_creates_an_admin_user_and_demo_merchants(): void
     {
         $this->seed(DatabaseSeeder::class);
 
         $this->assertSame(1, User::where('role', 'admin')->count());
-        $this->assertSame(1, Merchant::count());
-        $this->assertSame(1, Assessment::count());
+        $this->assertSame(3, Merchant::where('is_demo', true)->count());
+        $this->assertSame(3, Assessment::where('status', 'submitted')->count());
     }
 
     public function test_database_seeder_is_safe_to_run_more_than_once(): void
@@ -28,7 +28,7 @@ class DatabaseSeederTest extends TestCase
         $this->seed(DatabaseSeeder::class);
 
         $this->assertSame(1, User::where('role', 'admin')->count());
-        $this->assertSame(1, Merchant::count());
-        $this->assertSame(1, Assessment::count());
+        $this->assertSame(3, Merchant::where('is_demo', true)->count());
+        $this->assertSame(3, Assessment::where('status', 'submitted')->count());
     }
 }
