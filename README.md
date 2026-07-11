@@ -20,7 +20,7 @@ The production database is seeded with three realistic demo merchants spanning t
 
 ## Tech Stack
 
-- Laravel 11 (PHP 8.2)
+- Laravel 12 (PHP 8.2)
 - Vue 3 + Inertia.js
 - Tailwind CSS
 - PostgreSQL in production (Render), SQLite for local development
