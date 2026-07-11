@@ -87,6 +87,9 @@ async function startAssessment() {
     if (!startPromise) {
         startPromise = axios.post('/api/assessments').then((response) => {
             assessmentId.value = response.data.assessment.id;
+        }).catch((error) => {
+            startPromise = null;
+            throw error;
         });
     }
 
