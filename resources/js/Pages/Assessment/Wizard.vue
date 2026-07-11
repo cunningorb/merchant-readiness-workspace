@@ -127,15 +127,15 @@ function runSave() {
 }
 
 async function performSave(sectionIndex) {
-    await startAssessment();
-
-    const section = props.catalog[sectionIndex];
-    const payload = section.questions.map((question) => ({
-        question_key: question.key,
-        value: answers.value[question.key] ?? (question.type === 'multiselect' ? [] : null),
-    }));
-
     try {
+        await startAssessment();
+
+        const section = props.catalog[sectionIndex];
+        const payload = section.questions.map((question) => ({
+            question_key: question.key,
+            value: answers.value[question.key] ?? (question.type === 'multiselect' ? [] : null),
+        }));
+
         await axios.post(`/api/assessments/${assessmentId.value}/answers`, {
             answers: payload,
         });
@@ -147,7 +147,9 @@ async function performSave(sectionIndex) {
     } catch (error) {
         if (currentSectionIndex.value === sectionIndex) {
             errors.value = error.response?.data?.errors ?? {};
-            status.value = 'Check the highlighted answers.';
+            status.value = error.response
+                ? 'Check the highlighted answers.'
+                : 'Connection issue — your last change may not be saved. Keep editing to retry.';
         }
     }
 }
