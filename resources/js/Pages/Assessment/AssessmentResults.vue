@@ -33,6 +33,7 @@ function tierColors(tier) {
 const overallScore = computed(() => props.result.assessment.overall_score);
 const overallTier = computed(() => props.result.assessment.overall_tier);
 const ringOffset = computed(() => RING_CIRCUMFERENCE * (1 - overallScore.value / 100));
+const scoreSummary = computed(() => `Score: ${overallScore.value} out of 100, ${overallTier.value} tier`);
 
 function sectionLabel(key) {
     const section = props.catalog.find((candidate) => candidate.key === key);
@@ -57,7 +58,7 @@ const recommendations = computed(() => props.result.recommendations ?? []);
 <template>
     <div class="mt-8 space-y-8 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
         <div class="flex flex-col items-center gap-6 sm:flex-row sm:items-center sm:justify-start">
-            <svg viewBox="0 0 120 120" class="h-32 w-32 shrink-0">
+            <svg viewBox="0 0 120 120" class="h-32 w-32 shrink-0" role="img" :aria-label="scoreSummary">
                 <circle cx="60" cy="60" r="52" fill="none" stroke="#e2e8f0" stroke-width="10" />
                 <circle
                     cx="60"

@@ -53,6 +53,14 @@ function sortIndicator(column) {
     return props.filters.direction === 'asc' ? '▲' : '▼';
 }
 
+function ariaSortFor(column) {
+    if (props.filters.sort !== column) {
+        return 'none';
+    }
+
+    return props.filters.direction === 'asc' ? 'ascending' : 'descending';
+}
+
 function formatDate(value) {
     return new Date(value).toLocaleDateString('en-US', {
         year: 'numeric',
@@ -79,6 +87,7 @@ function formatDate(value) {
                                 v-model="search"
                                 type="text"
                                 placeholder="Search by company or contact name"
+                                aria-label="Search by company or contact name"
                                 class="w-full max-w-sm rounded-xl border border-slate-300 px-4 py-2 text-sm text-slate-900 outline-none ring-blue-500 transition focus:ring-2"
                             >
                             <button
@@ -100,14 +109,20 @@ function formatDate(value) {
                     <table class="w-full text-left text-sm">
                         <thead>
                             <tr class="border-b border-slate-200 text-slate-500">
-                                <th class="cursor-pointer select-none py-2 pr-4 font-medium" @click="sortBy('company')">
-                                    Company / Contact {{ sortIndicator('company') }}
+                                <th class="py-2 pr-4 font-medium" :aria-sort="ariaSortFor('company')">
+                                    <button type="button" class="select-none hover:text-slate-900" @click="sortBy('company')">
+                                        Company / Contact {{ sortIndicator('company') }}
+                                    </button>
                                 </th>
-                                <th class="cursor-pointer select-none py-2 pr-4 font-medium" @click="sortBy('tier')">
-                                    Tier / Score {{ sortIndicator('tier') }}
+                                <th class="py-2 pr-4 font-medium" :aria-sort="ariaSortFor('tier')">
+                                    <button type="button" class="select-none hover:text-slate-900" @click="sortBy('tier')">
+                                        Tier / Score {{ sortIndicator('tier') }}
+                                    </button>
                                 </th>
-                                <th class="cursor-pointer select-none py-2 pr-4 font-medium" @click="sortBy('submitted_at')">
-                                    Submitted {{ sortIndicator('submitted_at') }}
+                                <th class="py-2 pr-4 font-medium" :aria-sort="ariaSortFor('submitted_at')">
+                                    <button type="button" class="select-none hover:text-slate-900" @click="sortBy('submitted_at')">
+                                        Submitted {{ sortIndicator('submitted_at') }}
+                                    </button>
                                 </th>
                             </tr>
                         </thead>

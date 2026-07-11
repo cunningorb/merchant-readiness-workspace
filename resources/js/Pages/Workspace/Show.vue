@@ -48,7 +48,7 @@ const submittedOn = computed(() => new Date(props.report.submitted_at).toLocaleD
 
     <AuthenticatedLayout>
         <template #header>
-            <Link :href="route('dashboard')" class="text-sm font-medium text-blue-600 hover:text-blue-700">&larr; Back to prospects</Link>
+            <Link :href="route('dashboard')" class="text-sm font-medium text-blue-600 hover:text-blue-700"><span aria-hidden="true">&larr;</span> Back to prospects</Link>
         </template>
 
         <div class="py-12">
