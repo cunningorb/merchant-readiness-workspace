@@ -73,20 +73,29 @@ function formatDate(value) {
         <div class="py-12">
             <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
                 <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                    <form class="mb-6 flex gap-2" @submit.prevent="applySearch">
-                        <input
-                            v-model="search"
-                            type="text"
-                            placeholder="Search by company or contact name"
-                            class="w-full max-w-sm rounded-xl border border-slate-300 px-4 py-2 text-sm text-slate-900 outline-none ring-blue-500 transition focus:ring-2"
+                    <div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <form class="flex gap-2" @submit.prevent="applySearch">
+                            <input
+                                v-model="search"
+                                type="text"
+                                placeholder="Search by company or contact name"
+                                class="w-full max-w-sm rounded-xl border border-slate-300 px-4 py-2 text-sm text-slate-900 outline-none ring-blue-500 transition focus:ring-2"
+                            >
+                            <button
+                                type="submit"
+                                class="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
+                            >
+                                Search
+                            </button>
+                        </form>
+
+                        <Link
+                            :href="route('assessment.wizard')"
+                            class="inline-flex justify-center rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
                         >
-                        <button
-                            type="submit"
-                            class="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
-                        >
-                            Search
-                        </button>
-                    </form>
+                            New assessment
+                        </Link>
+                    </div>
 
                     <table class="w-full text-left text-sm">
                         <thead>
