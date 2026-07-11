@@ -228,8 +228,8 @@ async function submitAssessment() {
                         <button
                             type="submit"
                             class="rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-200 transition hover:bg-blue-700 disabled:opacity-60"
-                            :disabled="isSaving"
-                            :aria-busy="isSaving"
+                            :disabled="isSaving || isSubmitting"
+                            :aria-busy="isSaving || isSubmitting"
                         >
                             {{ isSaving ? 'Saving…' : (isLastSection ? 'Save final draft section' : 'Save and continue') }}
                         </button>
@@ -240,8 +240,8 @@ async function submitAssessment() {
                     <button
                         type="button"
                         class="rounded-xl border border-blue-300 bg-blue-50 px-5 py-3 text-sm font-semibold text-blue-700 transition hover:bg-blue-100 disabled:opacity-60"
-                        :disabled="isSubmitting"
-                        :aria-busy="isSubmitting"
+                        :disabled="isSaving || isSubmitting"
+                        :aria-busy="isSaving || isSubmitting"
                         @click="submitAssessment"
                     >
                         {{ isSubmitting ? 'Submitting…' : 'Submit assessment' }}
