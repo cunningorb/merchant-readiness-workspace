@@ -1,7 +1,9 @@
 <script setup>
 import axios from 'axios';
-import { computed, ref, watch, watchEffect } from 'vue';
+import { computed, onMounted, ref, watch, watchEffect } from 'vue';
 import AssessmentResults from './AssessmentResults.vue';
+
+const AUTOSAVE_DEBOUNCE_MS = 600;
 
 const props = defineProps({
     catalog: {
@@ -13,12 +15,16 @@ const props = defineProps({
 const currentSectionIndex = ref(0);
 const assessmentId = ref(null);
 const answers = ref({});
-const status = ref('Start your assessment to save draft answers.');
+const status = ref('');
 const errors = ref({});
 const submitResult = ref(null);
 const submitError = ref(null);
-const isSaving = ref(false);
 const isSubmitting = ref(false);
+const isMounted = ref(false);
+
+let debounceTimer = null;
+let savePromise = null;
+let pendingSectionIndex = null;
 
 const currentSection = computed(() => props.catalog[currentSectionIndex.value]);
 const isLastSection = computed(() => currentSectionIndex.value === props.catalog.length - 1);
@@ -31,6 +37,22 @@ watchEffect(() => {
             }
         });
     });
+});
+
+onMounted(() => {
+    isMounted.value = true;
+});
+
+watch(answers, () => {
+    if (!isMounted.value) {
+        return;
+    }
+
+    queueSave();
+}, { deep: true });
+
+watch(currentSectionIndex, () => {
+    errors.value = {};
 });
 
 function questionError(index) {
@@ -56,10 +78,6 @@ function missingSectionLabels() {
     return labels;
 }
 
-watch(currentSectionIndex, () => {
-    errors.value = {};
-});
-
 async function startAssessment() {
     if (assessmentId.value) {
         return;
@@ -67,42 +85,91 @@ async function startAssessment() {
 
     const response = await axios.post('/api/assessments');
     assessmentId.value = response.data.assessment.id;
-    status.value = 'Draft started. Answers save section by section.';
 }
 
-async function saveSection() {
-    isSaving.value = true;
+function queueSave() {
+    pendingSectionIndex = currentSectionIndex.value;
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(runSave, AUTOSAVE_DEBOUNCE_MS);
+}
+
+function flushSaveImmediately() {
+    if (pendingSectionIndex !== null) {
+        clearTimeout(debounceTimer);
+        runSave();
+    }
+}
+
+function runSave() {
+    if (savePromise) {
+        return;
+    }
+
+    const sectionIndex = pendingSectionIndex;
+    pendingSectionIndex = null;
+
+    savePromise = performSave(sectionIndex).finally(() => {
+        savePromise = null;
+
+        if (pendingSectionIndex !== null) {
+            runSave();
+        }
+    });
+}
+
+async function performSave(sectionIndex) {
+    await startAssessment();
+
+    const section = props.catalog[sectionIndex];
+    const payload = section.questions.map((question) => ({
+        question_key: question.key,
+        value: answers.value[question.key] ?? (question.type === 'multiselect' ? [] : null),
+    }));
 
     try {
-        await startAssessment();
+        await axios.post(`/api/assessments/${assessmentId.value}/answers`, {
+            answers: payload,
+        });
 
-        errors.value = {};
-
-        const payload = currentSection.value.questions.map((question) => ({
-            question_key: question.key,
-            value: answers.value[question.key] ?? (question.type === 'multiselect' ? [] : null),
-        }));
-
-        try {
-            const response = await axios.post(`/api/assessments/${assessmentId.value}/answers`, {
-                answers: payload,
-            });
-
-            status.value = `Draft saved with ${response.data.assessment.answers_count} answer(s).`;
-
-            if (!isLastSection.value) {
-                currentSectionIndex.value += 1;
-            }
-        } catch (error) {
-            errors.value = error.response?.data?.errors ?? {};
-            status.value = 'Check the highlighted answers before continuing.';
+        if (currentSectionIndex.value === sectionIndex) {
+            errors.value = {};
+            status.value = 'All changes saved.';
         }
-    } finally {
-        isSaving.value = false;
+    } catch (error) {
+        if (currentSectionIndex.value === sectionIndex) {
+            errors.value = error.response?.data?.errors ?? {};
+            status.value = 'Check the highlighted answers.';
+        }
+    }
+}
+
+async function flushPendingSave() {
+    clearTimeout(debounceTimer);
+
+    if (pendingSectionIndex !== null && !savePromise) {
+        runSave();
+    }
+
+    while (savePromise) {
+        await savePromise;
+    }
+}
+
+function selectSection(index) {
+    flushSaveImmediately();
+    currentSectionIndex.value = index;
+}
+
+function nextSection() {
+    flushSaveImmediately();
+
+    if (!isLastSection.value) {
+        currentSectionIndex.value += 1;
     }
 }
 
 function previousSection() {
+    flushSaveImmediately();
     currentSectionIndex.value = Math.max(0, currentSectionIndex.value - 1);
 }
 
@@ -111,6 +178,9 @@ async function submitAssessment() {
     isSubmitting.value = true;
 
     try {
+        await startAssessment();
+        await flushPendingSave();
+
         const response = await axios.post(`/api/assessments/${assessmentId.value}/submit`);
         submitResult.value = response.data;
     } catch (error) {
@@ -139,7 +209,7 @@ async function submitAssessment() {
                 </p>
                 <h1 class="text-4xl font-bold tracking-tight sm:text-5xl">Evaluate your returns operation.</h1>
                 <p class="mt-5 text-lg leading-8 text-slate-600">
-                    Complete each section to save a draft assessment, then submit to see your readiness score, breakdown, and recommendations.
+                    Complete each section, then submit to see your readiness score, breakdown, and recommendations. Your answers save automatically as you go.
                 </p>
             </div>
 
@@ -152,13 +222,13 @@ async function submitAssessment() {
                         class="rounded-2xl border px-4 py-3 text-left text-sm transition"
                         :class="index === currentSectionIndex ? 'border-blue-400 bg-blue-50 text-blue-700' : 'border-slate-200 bg-white text-slate-600'"
                         :aria-current="index === currentSectionIndex ? 'step' : undefined"
-                        @click="currentSectionIndex = index"
+                        @click="selectSection(index)"
                     >
                         {{ section.label }}
                     </button>
                 </div>
 
-                <form class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm" @submit.prevent="saveSection">
+                <form class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm" @submit.prevent="nextSection">
                     <div class="mb-6 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
                         <div>
                             <p class="text-sm font-medium text-blue-600">Section {{ currentSectionIndex + 1 }} of {{ catalog.length }}</p>
@@ -220,18 +290,17 @@ async function submitAssessment() {
                         <button
                             type="button"
                             class="rounded-xl border border-slate-300 px-5 py-3 text-sm font-semibold text-slate-700 disabled:opacity-40"
-                            :disabled="currentSectionIndex === 0 || isSaving || isSubmitting"
+                            :disabled="currentSectionIndex === 0"
                             @click="previousSection"
                         >
                             Previous
                         </button>
                         <button
+                            v-if="!isLastSection"
                             type="submit"
-                            class="rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-200 transition hover:bg-blue-700 disabled:opacity-60"
-                            :disabled="isSaving || isSubmitting"
-                            :aria-busy="isSaving || isSubmitting"
+                            class="rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-200 transition hover:bg-blue-700"
                         >
-                            {{ isSaving ? 'Saving…' : (isLastSection ? 'Save final draft section' : 'Save and continue') }}
+                            Next
                         </button>
                     </div>
                 </form>
@@ -240,8 +309,8 @@ async function submitAssessment() {
                     <button
                         type="button"
                         class="rounded-xl border border-blue-300 bg-blue-50 px-5 py-3 text-sm font-semibold text-blue-700 transition hover:bg-blue-100 disabled:opacity-60"
-                        :disabled="isSaving || isSubmitting"
-                        :aria-busy="isSaving || isSubmitting"
+                        :disabled="isSubmitting"
+                        :aria-busy="isSubmitting"
                         @click="submitAssessment"
                     >
                         {{ isSubmitting ? 'Submitting…' : 'Submit assessment' }}
