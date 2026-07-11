@@ -67,6 +67,36 @@ function humanize(key) {
     return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 }
 
+function toPercent(fraction) {
+    return `${Math.round(fraction * 100)}%`;
+}
+
+function isFraction(value) {
+    return typeof value === 'number' && value >= 0 && value <= 1;
+}
+
+function formatValue(value) {
+    if (Array.isArray(value)) {
+        return value.length ? value.join(', ') : 'None';
+    }
+
+    if (typeof value === 'boolean') {
+        return value ? 'Yes' : 'No';
+    }
+
+    if (value !== null && typeof value === 'object' && 'min' in value && 'max' in value) {
+        return isFraction(value.min) && isFraction(value.max)
+            ? `${toPercent(value.min)}–${toPercent(value.max)}`
+            : `${value.min}–${value.max}`;
+    }
+
+    if (isFraction(value)) {
+        return toPercent(value);
+    }
+
+    return value;
+}
+
 const lineItems = computed(() => {
     if (!props.explanation) {
         return [];
@@ -75,14 +105,14 @@ const lineItems = computed(() => {
     const inputs = Object.entries(props.explanation.inputs ?? {}).map(([key, value]) => ({
         key: `input-${key}`,
         label: humanize(key),
-        value,
+        value: formatValue(value),
         source: 'Your answer',
     }));
 
     const assumptions = Object.entries(props.explanation.assumptions ?? {}).map(([key, assumption]) => ({
         key: `assumption-${key}`,
         label: humanize(key),
-        value: assumption?.value ?? assumption,
+        value: formatValue(assumption?.value ?? assumption),
         source: 'Configured assumption',
     }));
 
