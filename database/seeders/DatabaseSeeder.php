@@ -17,12 +17,16 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        User::factory()->admin()->create([
-            'name' => 'Admin User',
-            'email' => 'admin@merchant-readiness.test',
-        ]);
+        if (! User::where('email', 'admin@merchant-readiness.test')->exists()) {
+            User::factory()->admin()->create([
+                'name' => 'Admin User',
+                'email' => 'admin@merchant-readiness.test',
+            ]);
+        }
 
-        $merchant = Merchant::factory()->create();
-        Assessment::factory()->for($merchant)->create();
+        if (! Merchant::query()->exists()) {
+            $merchant = Merchant::factory()->create();
+            Assessment::factory()->for($merchant)->create();
+        }
     }
 }

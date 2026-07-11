@@ -21,4 +21,14 @@ class DatabaseSeederTest extends TestCase
         $this->assertSame(1, Merchant::count());
         $this->assertSame(1, Assessment::count());
     }
+
+    public function test_database_seeder_is_safe_to_run_more_than_once(): void
+    {
+        $this->seed(DatabaseSeeder::class);
+        $this->seed(DatabaseSeeder::class);
+
+        $this->assertSame(1, User::where('role', 'admin')->count());
+        $this->assertSame(1, Merchant::count());
+        $this->assertSame(1, Assessment::count());
+    }
 }
