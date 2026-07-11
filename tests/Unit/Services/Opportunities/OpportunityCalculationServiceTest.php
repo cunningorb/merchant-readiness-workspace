@@ -10,6 +10,7 @@ use App\Models\AssessmentOpportunity;
 use App\Services\Opportunities\OpportunityCalculationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Collection;
+use InvalidArgumentException;
 use Tests\TestCase;
 
 class OpportunityCalculationServiceTest extends TestCase
@@ -265,6 +266,20 @@ class OpportunityCalculationServiceTest extends TestCase
 
         $this->assertEqualsWithDelta(54000.0, (float) $opportunity->minimum_value, 0.001);
         $this->assertEqualsWithDelta(81000.0, (float) $opportunity->maximum_value, 0.001);
+    }
+
+    public function test_inverted_configured_range_throws_instead_of_persisting(): void
+    {
+        config()->set('assessment.opportunities.exchange_conversion_lift', ['min' => 0.12, 'max' => 0.08]);
+
+        $assessment = Assessment::factory()->create();
+        $this->answer($assessment, 'business.monthly_order_volume', 'business', '1,000-10,000');
+        $this->answer($assessment, 'catalog.fit_sensitive_categories', 'catalog', ['Apparel']);
+        $this->answer($assessment, 'exchanges.offered', 'exchanges', false);
+
+        $this->expectException(InvalidArgumentException::class);
+
+        $this->calculate($assessment);
     }
 
     // --- evidence / assumptions -------------------------------------------
