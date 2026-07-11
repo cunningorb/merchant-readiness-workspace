@@ -57,7 +57,8 @@ class WorkspaceController extends Controller
 
         $assessment->loadMissing(['merchant', 'recommendations', 'report']);
 
-        $payload = $service->buildPayload($assessment->report);
+        $report = $assessment->report ?? $service->createForAssessment($assessment);
+        $payload = $service->buildPayload($report);
         $payload['merchant']['contact_name'] = $assessment->merchant->contact_name;
         $payload['merchant']['contact_email'] = $assessment->merchant->contact_email;
         $payload['merchant']['website'] = $assessment->merchant->website;

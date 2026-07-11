@@ -187,4 +187,24 @@ class WorkspaceTest extends TestCase
 
         $response->assertRedirect('/login');
     }
+
+    public function test_show_creates_missing_report_for_submitted_assessment_without_one(): void
+    {
+        $user = User::factory()->create();
+        $assessment = Assessment::factory()->create([
+            'status' => 'submitted',
+            'submitted_at' => now(),
+            'overall_score' => 50,
+            'overall_tier' => 'Developing',
+            'section_scores' => ['return_policy' => ['score' => 50, 'tier' => 'Developing']],
+        ]);
+
+        $this->assertDatabaseCount('reports', 0);
+
+        $response = $this->actingAs($user)->get("/dashboard/assessments/{$assessment->id}");
+
+        $response->assertOk();
+        $this->assertDatabaseCount('reports', 1);
+        $this->assertNotNull($assessment->fresh()->report);
+    }
 }
