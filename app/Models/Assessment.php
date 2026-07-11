@@ -54,6 +54,11 @@ class Assessment extends Model
         return $this->hasMany(Recommendation::class);
     }
 
+    public function opportunities(): HasMany
+    {
+        return $this->hasMany(AssessmentOpportunity::class)->orderBy('sort_order');
+    }
+
     public function report(): HasOne
     {
         return $this->hasOne(Report::class);
