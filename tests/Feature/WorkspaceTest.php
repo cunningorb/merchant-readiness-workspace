@@ -4,6 +4,8 @@ namespace Tests\Feature;
 
 use App\Models\Assessment;
 use App\Models\Merchant;
+use App\Models\Recommendation;
+use App\Models\Report;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -114,5 +116,75 @@ class WorkspaceTest extends TestCase
             ->where('assessments.data.0.id', $a->id)
             ->where('assessments.data.1.id', $z->id)
         );
+    }
+
+    public function test_shows_assessment_review_with_merchant_and_talking_points(): void
+    {
+        $user = User::factory()->create();
+        $merchant = Merchant::factory()->create([
+            'company_name' => 'Acme Corp',
+            'contact_name' => 'Jane Doe',
+            'contact_email' => 'jane@acme.com',
+            'website' => 'acme.com',
+        ]);
+        $assessment = Assessment::factory()->for($merchant)->create([
+            'status' => 'submitted',
+            'submitted_at' => now(),
+            'overall_score' => 72,
+            'overall_tier' => 'Established',
+            'section_scores' => ['return_policy' => ['score' => 72, 'tier' => 'Established']],
+        ]);
+        Report::factory()->for($assessment)->create(['published_at' => now()]);
+
+        Recommendation::factory()->for($assessment)->create(['priority' => 'low', 'title' => 'Low priority item']);
+        Recommendation::factory()->for($assessment)->create(['priority' => 'high', 'title' => 'High priority item']);
+        Recommendation::factory()->for($assessment)->create(['priority' => 'medium', 'title' => 'Medium priority item']);
+        Recommendation::factory()->for($assessment)->create(['priority' => 'high', 'title' => 'Second high priority item']);
+
+        $response = $this->actingAs($user)->get("/dashboard/assessments/{$assessment->id}");
+
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page
+            ->component('Workspace/Show')
+            ->where('report.merchant.company_name', 'Acme Corp')
+            ->where('report.merchant.contact_name', 'Jane Doe')
+            ->where('report.merchant.contact_email', 'jane@acme.com')
+            ->where('report.merchant.website', 'acme.com')
+            ->where('report.assessment.overall_score', 72)
+            ->has('report.talking_points', 3)
+            ->where('report.talking_points.0.title', 'High priority item')
+            ->where('report.talking_points.1.title', 'Second high priority item')
+            ->where('report.talking_points.2.title', 'Medium priority item')
+        );
+    }
+
+    public function test_show_404s_for_unknown_assessment(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->get('/dashboard/assessments/does-not-exist');
+
+        $response->assertNotFound();
+    }
+
+    public function test_show_404s_for_draft_assessment(): void
+    {
+        $user = User::factory()->create();
+        $assessment = Assessment::factory()->create(['status' => 'draft']);
+
+        $response = $this->actingAs($user)->get("/dashboard/assessments/{$assessment->id}");
+
+        $response->assertNotFound();
+    }
+
+    public function test_show_requires_authentication(): void
+    {
+        $merchant = Merchant::factory()->create();
+        $assessment = Assessment::factory()->for($merchant)->create(['status' => 'submitted', 'submitted_at' => now()]);
+        Report::factory()->for($assessment)->create(['published_at' => now()]);
+
+        $response = $this->get("/dashboard/assessments/{$assessment->id}");
+
+        $response->assertRedirect('/login');
     }
 }

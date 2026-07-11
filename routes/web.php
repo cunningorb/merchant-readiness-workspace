@@ -24,6 +24,7 @@ Route::get('/reports/{report:token}', [ReportController::class, 'show'])->name('
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/dashboard', [WorkspaceController::class, 'index'])->name('dashboard');
+    Route::get('/dashboard/assessments/{assessment}', [WorkspaceController::class, 'show'])->name('workspace.assessments.show');
 });
 
 Route::middleware('auth')->group(function () {

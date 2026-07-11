@@ -3,6 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\Assessment;
+use App\Models\Recommendation;
+use App\Services\AssessmentQuestionCatalog;
+use App\Services\ReportBuilderService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -45,6 +48,40 @@ class WorkspaceController extends Controller
                 'sort' => $sort,
                 'direction' => $direction,
             ],
+        ]);
+    }
+
+    public function show(Assessment $assessment, AssessmentQuestionCatalog $catalog, ReportBuilderService $service): Response
+    {
+        abort_if($assessment->status !== 'submitted', 404);
+
+        $assessment->loadMissing(['merchant', 'recommendations', 'report']);
+
+        $payload = $service->buildPayload($assessment->report);
+        $payload['merchant']['contact_name'] = $assessment->merchant->contact_name;
+        $payload['merchant']['contact_email'] = $assessment->merchant->contact_email;
+        $payload['merchant']['website'] = $assessment->merchant->website;
+        $payload['submitted_at'] = $assessment->submitted_at;
+        $payload['talking_points'] = $assessment->recommendations
+            ->sortBy('id')
+            ->sortBy(fn (Recommendation $recommendation) => match ($recommendation->priority) {
+                'high' => 0,
+                'medium' => 1,
+                'low' => 2,
+                default => 3,
+            })
+            ->take(3)
+            ->values()
+            ->map(fn (Recommendation $recommendation) => [
+                'title' => $recommendation->title,
+                'description' => $recommendation->description,
+                'expected_impact' => $recommendation->expected_impact,
+            ])
+            ->all();
+
+        return Inertia::render('Workspace/Show', [
+            'report' => $payload,
+            'catalog' => $catalog->sections(),
         ]);
     }
 }
