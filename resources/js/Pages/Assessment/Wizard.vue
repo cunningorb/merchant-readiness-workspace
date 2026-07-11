@@ -17,6 +17,8 @@ const status = ref('Start your assessment to save draft answers.');
 const errors = ref({});
 const submitResult = ref(null);
 const submitError = ref(null);
+const isSaving = ref(false);
+const isSubmitting = ref(false);
 
 const currentSection = computed(() => props.catalog[currentSectionIndex.value]);
 const isLastSection = computed(() => currentSectionIndex.value === props.catalog.length - 1);
@@ -69,28 +71,34 @@ async function startAssessment() {
 }
 
 async function saveSection() {
-    await startAssessment();
-
-    errors.value = {};
-
-    const payload = currentSection.value.questions.map((question) => ({
-        question_key: question.key,
-        value: answers.value[question.key] ?? (question.type === 'multiselect' ? [] : null),
-    }));
+    isSaving.value = true;
 
     try {
-        const response = await axios.post(`/api/assessments/${assessmentId.value}/answers`, {
-            answers: payload,
-        });
+        await startAssessment();
 
-        status.value = `Draft saved with ${response.data.assessment.answers_count} answer(s).`;
+        errors.value = {};
 
-        if (!isLastSection.value) {
-            currentSectionIndex.value += 1;
+        const payload = currentSection.value.questions.map((question) => ({
+            question_key: question.key,
+            value: answers.value[question.key] ?? (question.type === 'multiselect' ? [] : null),
+        }));
+
+        try {
+            const response = await axios.post(`/api/assessments/${assessmentId.value}/answers`, {
+                answers: payload,
+            });
+
+            status.value = `Draft saved with ${response.data.assessment.answers_count} answer(s).`;
+
+            if (!isLastSection.value) {
+                currentSectionIndex.value += 1;
+            }
+        } catch (error) {
+            errors.value = error.response?.data?.errors ?? {};
+            status.value = 'Check the highlighted answers before continuing.';
         }
-    } catch (error) {
-        errors.value = error.response?.data?.errors ?? {};
-        status.value = 'Check the highlighted answers before continuing.';
+    } finally {
+        isSaving.value = false;
     }
 }
 
@@ -100,6 +108,7 @@ function previousSection() {
 
 async function submitAssessment() {
     submitError.value = null;
+    isSubmitting.value = true;
 
     try {
         const response = await axios.post(`/api/assessments/${assessmentId.value}/submit`);
@@ -115,6 +124,8 @@ async function submitAssessment() {
                 ? `Missing required answers in: ${sections.join(', ')}.`
                 : 'Check the highlighted answers before submitting.';
         }
+    } finally {
+        isSubmitting.value = false;
     }
 }
 </script>
@@ -140,6 +151,7 @@ async function submitAssessment() {
                         type="button"
                         class="rounded-2xl border px-4 py-3 text-left text-sm transition"
                         :class="index === currentSectionIndex ? 'border-blue-400 bg-blue-50 text-blue-700' : 'border-slate-200 bg-white text-slate-600'"
+                        :aria-current="index === currentSectionIndex ? 'step' : undefined"
                         @click="currentSectionIndex = index"
                     >
                         {{ section.label }}
@@ -152,7 +164,7 @@ async function submitAssessment() {
                             <p class="text-sm font-medium text-blue-600">Section {{ currentSectionIndex + 1 }} of {{ catalog.length }}</p>
                             <h2 class="mt-1 text-2xl font-semibold">{{ currentSection.label }}</h2>
                         </div>
-                        <p class="text-sm text-slate-500">{{ status }}</p>
+                        <p class="text-sm text-slate-500" role="status" aria-live="polite">{{ status }}</p>
                     </div>
 
                     <div class="space-y-6">
@@ -166,12 +178,14 @@ async function submitAssessment() {
                                 v-if="['text', 'email'].includes(question.type)"
                                 v-model="answers[question.key]"
                                 :type="question.type"
+                                :aria-required="question.required"
                                 class="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none ring-blue-500 transition focus:ring-2"
                             >
 
                             <select
                                 v-else-if="question.type === 'select'"
                                 v-model="answers[question.key]"
+                                :aria-required="question.required"
                                 class="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none ring-blue-500 transition focus:ring-2"
                             >
                                 <option :value="null">Choose one</option>
@@ -188,6 +202,7 @@ async function submitAssessment() {
                             <select
                                 v-else-if="question.type === 'boolean'"
                                 v-model="answers[question.key]"
+                                :aria-required="question.required"
                                 class="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none ring-blue-500 transition focus:ring-2"
                             >
                                 <option :value="null">Choose one</option>
@@ -202,11 +217,21 @@ async function submitAssessment() {
                     </div>
 
                     <div class="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-between">
-                        <button type="button" class="rounded-xl border border-slate-300 px-5 py-3 text-sm font-semibold text-slate-700 disabled:opacity-40" :disabled="currentSectionIndex === 0" @click="previousSection">
+                        <button
+                            type="button"
+                            class="rounded-xl border border-slate-300 px-5 py-3 text-sm font-semibold text-slate-700 disabled:opacity-40"
+                            :disabled="currentSectionIndex === 0 || isSaving || isSubmitting"
+                            @click="previousSection"
+                        >
                             Previous
                         </button>
-                        <button type="submit" class="rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-200 transition hover:bg-blue-700">
-                            {{ isLastSection ? 'Save final draft section' : 'Save and continue' }}
+                        <button
+                            type="submit"
+                            class="rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-200 transition hover:bg-blue-700 disabled:opacity-60"
+                            :disabled="isSaving"
+                            :aria-busy="isSaving"
+                        >
+                            {{ isSaving ? 'Saving…' : (isLastSection ? 'Save final draft section' : 'Save and continue') }}
                         </button>
                     </div>
                 </form>
@@ -214,14 +239,16 @@ async function submitAssessment() {
                 <div v-if="isLastSection" class="mt-6 flex justify-end">
                     <button
                         type="button"
-                        class="rounded-xl border border-blue-300 bg-blue-50 px-5 py-3 text-sm font-semibold text-blue-700 transition hover:bg-blue-100"
+                        class="rounded-xl border border-blue-300 bg-blue-50 px-5 py-3 text-sm font-semibold text-blue-700 transition hover:bg-blue-100 disabled:opacity-60"
+                        :disabled="isSubmitting"
+                        :aria-busy="isSubmitting"
                         @click="submitAssessment"
                     >
-                        Submit assessment
+                        {{ isSubmitting ? 'Submitting…' : 'Submit assessment' }}
                     </button>
                 </div>
 
-                <p v-if="submitError" class="mt-3 text-right text-sm text-red-600">{{ submitError }}</p>
+                <p v-if="submitError" class="mt-3 text-right text-sm text-red-600" role="alert">{{ submitError }}</p>
             </template>
 
             <AssessmentResults v-if="submitResult" :result="submitResult" :catalog="catalog" :report-url="submitResult.report.url" />
