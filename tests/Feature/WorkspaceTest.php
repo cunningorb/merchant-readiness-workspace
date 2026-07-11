@@ -188,6 +188,33 @@ class WorkspaceTest extends TestCase
         $response->assertRedirect('/login');
     }
 
+    public function test_show_includes_opportunity_first_payload_keys(): void
+    {
+        $user = User::factory()->create();
+        $assessment = Assessment::factory()->create([
+            'status' => 'submitted',
+            'submitted_at' => now(),
+            'overall_score' => 72,
+            'overall_tier' => 'Established',
+            'section_scores' => ['return_policy' => ['score' => 72, 'tier' => 'Established']],
+        ]);
+        Report::factory()->for($assessment)->create(['published_at' => now()]);
+
+        $response = $this->actingAs($user)->get("/dashboard/assessments/{$assessment->id}");
+
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page
+            ->component('Workspace/Show')
+            ->has('report.heroOpportunity')
+            ->has('report.supportingMetrics')
+            ->has('report.topRecommendations')
+            ->has('report.remainingRecommendations')
+            ->has('report.calculationExplanations')
+            ->has('report.actionPlan.this_week')
+            ->has('report.actionPlan.plan_next')
+        );
+    }
+
     public function test_show_creates_missing_report_for_submitted_assessment_without_one(): void
     {
         $user = User::factory()->create();

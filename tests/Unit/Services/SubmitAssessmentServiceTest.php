@@ -79,4 +79,55 @@ class SubmitAssessmentServiceTest extends TestCase
             $this->assertSame(409, $e->getStatusCode());
         }
     }
+
+    public function test_submit_persists_ranked_opportunities_for_a_fully_answered_assessment(): void
+    {
+        $assessment = $this->completeAssessment();
+
+        $result = app(SubmitAssessmentService::class)->submit($assessment);
+
+        $this->assertCount(3, $result->opportunities);
+        $this->assertSame(
+            ['retained_revenue', 'manual_work_savings', 'support_contact_reduction'],
+            $result->opportunities->pluck('type')->all()
+        );
+        $this->assertSame([0, 1, 2], $result->opportunities->pluck('sort_order')->all());
+        $this->assertDatabaseCount('assessment_opportunities', 3);
+        $this->assertDatabaseHas('assessment_opportunities', [
+            'assessment_id' => $assessment->id,
+            'type' => 'retained_revenue',
+            'sort_order' => 0,
+        ]);
+    }
+
+    public function test_submit_succeeds_with_zero_opportunities_when_bands_are_unrecognized(): void
+    {
+        $assessment = Assessment::factory()->create();
+
+        $answers = [
+            ['question_key' => 'business.company_name', 'section' => 'business', 'value' => 'Northwind Supply'],
+            ['question_key' => 'business.contact_email', 'section' => 'business', 'value' => 'ops@example.com'],
+            ['question_key' => 'business.monthly_order_volume', 'section' => 'business', 'value' => 'Not a real band'],
+            ['question_key' => 'catalog.sku_count', 'section' => 'catalog', 'value' => '500-5,000'],
+            ['question_key' => 'catalog.fit_sensitive_categories', 'section' => 'catalog', 'value' => []],
+            ['question_key' => 'return_policy.window_days', 'section' => 'return_policy', 'value' => 'More than 60 days'],
+            ['question_key' => 'return_policy.policy_clarity', 'section' => 'return_policy', 'value' => 'Contextual policy by product/order'],
+            ['question_key' => 'exchanges.offered', 'section' => 'exchanges', 'value' => true],
+            ['question_key' => 'exchanges.incentives', 'section' => 'exchanges', 'value' => ['Bonus credit']],
+            ['question_key' => 'manual_operations.weekly_hours', 'section' => 'manual_operations', 'value' => 'Not a real band'],
+            ['question_key' => 'manual_operations.common_bottlenecks', 'section' => 'manual_operations', 'value' => []],
+            ['question_key' => 'platform.ecommerce_platform', 'section' => 'platform', 'value' => 'Shopify'],
+            ['question_key' => 'platform.return_tools', 'section' => 'platform', 'value' => 'Custom automation'],
+        ];
+
+        foreach ($answers as $answer) {
+            AssessmentAnswer::factory()->for($assessment)->create($answer);
+        }
+
+        $result = app(SubmitAssessmentService::class)->submit($assessment->fresh(['answers']));
+
+        $this->assertSame('submitted', $result->status);
+        $this->assertCount(0, $result->opportunities);
+        $this->assertDatabaseCount('assessment_opportunities', 0);
+    }
 }

@@ -76,4 +76,40 @@ class ReportAccessTest extends TestCase
 
         $response->assertNotFound();
     }
+
+    public function test_api_report_endpoint_includes_opportunity_first_payload_keys(): void
+    {
+        $report = $this->reportedAssessment();
+
+        $response = $this->getJson("/api/reports/{$report->token}");
+
+        $response->assertOk()
+            ->assertJsonStructure([
+                'heroOpportunity',
+                'supportingMetrics',
+                'topRecommendations',
+                'remainingRecommendations',
+                'calculationExplanations',
+                'actionPlan' => ['this_week', 'plan_next'],
+            ]);
+    }
+
+    public function test_web_report_page_receives_opportunity_first_payload_keys(): void
+    {
+        $report = $this->reportedAssessment();
+
+        $response = $this->get("/reports/{$report->token}");
+
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page
+            ->component('Reports/Show')
+            ->has('report.heroOpportunity')
+            ->has('report.supportingMetrics')
+            ->has('report.topRecommendations')
+            ->has('report.remainingRecommendations')
+            ->has('report.calculationExplanations')
+            ->has('report.actionPlan.this_week')
+            ->has('report.actionPlan.plan_next')
+        );
+    }
 }

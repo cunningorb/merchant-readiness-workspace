@@ -4,6 +4,8 @@ namespace App\Services;
 
 use App\Contracts\AssessmentScorer;
 use App\Models\Assessment;
+use App\Services\Opportunities\OpportunityCalculationService;
+use App\Services\Opportunities\OpportunityRankingService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -14,8 +16,9 @@ class SubmitAssessmentService
         private readonly AssessmentScorer $scorer,
         private readonly RecommendationEngine $recommendations,
         private readonly ReportBuilderService $reports,
-    ) {
-    }
+        private readonly OpportunityCalculationService $opportunityCalculator,
+        private readonly OpportunityRankingService $opportunityRanker,
+    ) {}
 
     public function submit(Assessment $assessment): Assessment
     {
@@ -49,6 +52,14 @@ class SubmitAssessmentService
                 ])
             );
 
+            $opportunities = $this->opportunityRanker->rankOpportunities(
+                $this->opportunityCalculator->calculate($assessment)
+            );
+
+            foreach ($opportunities as $opportunity) {
+                $opportunity->save();
+            }
+
             $assessment->forceFill([
                 'overall_score' => $scores->overallScore,
                 'overall_tier' => $scores->overallTier,
@@ -60,7 +71,7 @@ class SubmitAssessmentService
             $this->reports->createForAssessment($assessment);
         });
 
-        return $assessment->fresh(['answers', 'recommendations', 'report']);
+        return $assessment->fresh(['answers', 'recommendations', 'report', 'opportunities']);
     }
 
     private function isAnswered(Assessment $assessment, string $questionKey): bool
