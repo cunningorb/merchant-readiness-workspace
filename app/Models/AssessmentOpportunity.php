@@ -12,6 +12,12 @@ class AssessmentOpportunity extends Model
     /** @use HasFactory<AssessmentOpportunityFactory> */
     use HasFactory;
 
+    public const TYPE_RETAINED_REVENUE = 'retained_revenue';
+
+    public const TYPE_MANUAL_WORK_SAVINGS = 'manual_work_savings';
+
+    public const TYPE_SUPPORT_CONTACT_REDUCTION = 'support_contact_reduction';
+
     protected $fillable = [
         'assessment_id',
         'type',

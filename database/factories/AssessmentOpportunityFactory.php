@@ -15,7 +15,11 @@ class AssessmentOpportunityFactory extends Factory
     {
         return [
             'assessment_id' => Assessment::factory(),
-            'type' => fake()->randomElement(['retained_revenue', 'time_savings']),
+            'type' => fake()->randomElement([
+                AssessmentOpportunity::TYPE_RETAINED_REVENUE,
+                AssessmentOpportunity::TYPE_MANUAL_WORK_SAVINGS,
+                AssessmentOpportunity::TYPE_SUPPORT_CONTACT_REDUCTION,
+            ]),
             'title' => fake()->sentence(4),
             'summary' => fake()->paragraph(),
             'minimum_value' => fake()->randomFloat(2, 1000, 5000),
