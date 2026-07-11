@@ -45,4 +45,25 @@ class DemoMerchantsSeederTest extends TestCase
 
         $this->assertSame(3, Merchant::where('is_demo', true)->count());
     }
+
+    public function test_self_heals_a_partial_seed(): void
+    {
+        $this->seed(DemoMerchantsSeeder::class);
+
+        // Simulate a crash mid-seed on a prior run: two of the three demo
+        // merchants never got created, as if the process died after the
+        // first profile but before the second and third.
+        Merchant::where('company_name', '!=', 'Thistle & Bloom Apparel')
+            ->where('is_demo', true)
+            ->each(fn (Merchant $merchant) => $merchant->delete());
+
+        $this->assertSame(1, Merchant::where('is_demo', true)->count());
+
+        $this->seed(DemoMerchantsSeeder::class);
+
+        $this->assertSame(3, Merchant::where('is_demo', true)->count());
+        $this->assertSame(1, Merchant::where('company_name', 'Thistle & Bloom Apparel')->count());
+        $this->assertNotNull(Merchant::where('company_name', 'Northline Outdoor Supply')->first());
+        $this->assertNotNull(Merchant::where('company_name', 'Vantage Home Goods')->first());
+    }
 }

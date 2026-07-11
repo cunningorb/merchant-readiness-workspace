@@ -15,11 +15,13 @@ class DemoMerchantsSeeder extends Seeder
         SaveAssessmentAnswersService $saveService,
         SubmitAssessmentService $submitService,
     ): void {
-        if (Merchant::where('is_demo', true)->exists()) {
-            return;
-        }
-
         foreach ($this->profiles() as $profile) {
+            $companyName = collect($profile['answers'])->firstWhere('question_key', 'business.company_name')['value'];
+
+            if (Merchant::where('is_demo', true)->where('company_name', $companyName)->exists()) {
+                continue;
+            }
+
             $assessment = $createService->createAnonymousDraft();
 
             $assessment->merchant->update([
