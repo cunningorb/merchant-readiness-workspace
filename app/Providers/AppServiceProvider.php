@@ -3,6 +3,9 @@
 namespace App\Providers;
 
 use App\Contracts\AssessmentScorer;
+use App\Services\Imports\Demo\DemoCatalogImporter;
+use App\Services\Imports\Demo\DemoInventoryImporter;
+use App\Services\Imports\Demo\DemoOrderReturnImporter;
 use App\Services\Imports\ImportProviderRegistry;
 use App\Services\ReadinessScoringService;
 use App\Services\RecommendationEngine;
@@ -48,5 +51,15 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Vite::prefetch(concurrency: 3);
+
+        // Register the demo provider's importers. This is the only provider
+        // registered so far; real providers (Shopify, CSV, ...) register the
+        // same way from their own service providers in later milestones.
+        $this->app->make(ImportProviderRegistry::class)->register(
+            provider: 'demo',
+            catalogImporter: $this->app->make(DemoCatalogImporter::class),
+            orderReturnImporter: $this->app->make(DemoOrderReturnImporter::class),
+            inventoryImporter: $this->app->make(DemoInventoryImporter::class),
+        );
     }
 }
