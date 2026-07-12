@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Contracts\AssessmentScorer;
 use App\Models\Assessment;
+use App\Services\Benchmarks\BenchmarkComparisonService;
 use App\Services\Opportunities\OpportunityCalculationService;
 use App\Services\Opportunities\OpportunityRankingService;
 use Illuminate\Support\Facades\DB;
@@ -18,6 +19,7 @@ class SubmitAssessmentService
         private readonly ReportBuilderService $reports,
         private readonly OpportunityCalculationService $opportunityCalculator,
         private readonly OpportunityRankingService $opportunityRanker,
+        private readonly BenchmarkComparisonService $benchmarkComparator,
     ) {}
 
     public function submit(Assessment $assessment): Assessment
@@ -60,6 +62,26 @@ class SubmitAssessmentService
                 $opportunity->save();
             }
 
+            $benchmarkComparisons = $this->benchmarkComparator->compare($assessment);
+
+            foreach ($benchmarkComparisons as $index => $comparison) {
+                $assessment->benchmarkComparisons()->create([
+                    'benchmark_set_id' => $comparison->benchmarkSetId,
+                    'metric_key' => $comparison->metricKey,
+                    'label' => $comparison->label,
+                    'merchant_value' => $comparison->merchantValue,
+                    'minimum_value' => $comparison->range->minimum,
+                    'maximum_value' => $comparison->range->maximum,
+                    'unit' => $comparison->range->unit,
+                    'interpretation' => $comparison->interpretation,
+                    'source_type' => $comparison->sourceType->value,
+                    'source_label' => $comparison->sourceLabel,
+                    'methodology' => $comparison->methodology,
+                    'benchmark_version' => $comparison->benchmarkVersion,
+                    'sort_order' => $index,
+                ]);
+            }
+
             $assessment->forceFill([
                 'overall_score' => $scores->overallScore,
                 'overall_tier' => $scores->overallTier,
@@ -71,7 +93,7 @@ class SubmitAssessmentService
             $this->reports->createForAssessment($assessment);
         });
 
-        return $assessment->fresh(['answers', 'recommendations', 'report', 'opportunities']);
+        return $assessment->fresh(['answers', 'recommendations', 'report', 'opportunities', 'benchmarkComparisons']);
     }
 
     private function isAnswered(Assessment $assessment, string $questionKey): bool

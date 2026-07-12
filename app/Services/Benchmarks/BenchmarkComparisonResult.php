@@ -16,6 +16,7 @@ final readonly class BenchmarkComparisonResult
         public string $sourceLabel,
         public string $methodology,
         public string $benchmarkVersion,
+        public ?int $benchmarkSetId = null,
     ) {}
 
     /**

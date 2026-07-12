@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Assessment;
+use App\Models\AssessmentBenchmarkComparison;
 use App\Models\AssessmentOpportunity;
 use App\Models\Recommendation;
 use App\Models\Report;
@@ -11,6 +12,12 @@ use Illuminate\Support\Collection;
 
 class ReportBuilderService
 {
+    private const PEER_COMPARISON_UNIT_LABELS = [
+        'days' => 'days',
+        'hours_per_week' => 'hrs/week',
+        'sku_count' => 'SKUs',
+    ];
+
     private const FORMULA_DESCRIPTIONS = [
         AssessmentOpportunity::TYPE_RETAINED_REVENUE => 'Annual order volume x estimated return rate x average order value x refund-eligible share x modeled exchange-conversion lift.',
         AssessmentOpportunity::TYPE_MANUAL_WORK_SAVINGS => 'Weekly manual returns hours x the share of that work believed automatable.',
@@ -37,7 +44,7 @@ class ReportBuilderService
     public function buildPayload(Report $report): array
     {
         $assessment = $report->assessment;
-        $assessment->loadMissing(['recommendations', 'merchant', 'answers', 'opportunities']);
+        $assessment->loadMissing(['recommendations', 'merchant', 'answers', 'opportunities', 'benchmarkComparisons']);
 
         $opportunities = $assessment->opportunities;
         $categoryMap = config('assessment.opportunities.recommendation_category_to_opportunity_type', []);
@@ -69,6 +76,7 @@ class ReportBuilderService
                 ->values()->all(),
             'calculationExplanations' => $this->calculationExplanations($opportunities),
             'actionPlan' => $this->actionPlan($rankedRecommendations),
+            'peerComparisons' => $this->peerComparisons($assessment->benchmarkComparisons),
         ];
     }
 
@@ -257,6 +265,43 @@ class ReportBuilderService
         return [
             'this_week' => $thisWeek->pluck('title')->all(),
             'plan_next' => $planNext->pluck('title')->all(),
+        ];
+    }
+
+    /**
+     * Sourced entirely from persisted AssessmentBenchmarkComparison rows,
+     * already ordered by sort_order via the assessment relation. Never
+     * recalculates - an empty collection (legacy assessments, or an
+     * assessment where nothing resolved) is a normal, valid state.
+     *
+     * @param  Collection<int, AssessmentBenchmarkComparison>  $comparisons
+     */
+    private function peerComparisons(Collection $comparisons): array
+    {
+        return $comparisons->map(fn (AssessmentBenchmarkComparison $comparison) => $this->peerComparisonItem($comparison))->all();
+    }
+
+    private function peerComparisonItem(AssessmentBenchmarkComparison $comparison): array
+    {
+        $unitLabel = self::PEER_COMPARISON_UNIT_LABELS[$comparison->unit] ?? $comparison->unit;
+        $merchantValue = (float) $comparison->merchant_value;
+        $minimum = (float) $comparison->minimum_value;
+        $maximum = (float) $comparison->maximum_value;
+
+        return [
+            'metric_key' => $comparison->metric_key,
+            'label' => $comparison->label,
+            'merchant_value' => $merchantValue,
+            'merchant_value_formatted' => number_format($merchantValue).' '.$unitLabel,
+            'minimum_value' => $minimum,
+            'maximum_value' => $maximum,
+            'unit' => $comparison->unit,
+            'range_formatted' => number_format($minimum).'–'.number_format($maximum).' '.$unitLabel,
+            'interpretation' => $comparison->interpretation,
+            'source_type' => $comparison->source_type,
+            'source_label' => $comparison->source_label,
+            'methodology' => $comparison->methodology,
+            'benchmark_version' => $comparison->benchmark_version,
         ];
     }
 }

@@ -112,4 +112,27 @@ class ReportAccessTest extends TestCase
             ->has('report.actionPlan.plan_next')
         );
     }
+
+    public function test_api_report_endpoint_includes_peer_comparisons_key(): void
+    {
+        $report = $this->reportedAssessment();
+
+        $response = $this->getJson("/api/reports/{$report->token}");
+
+        $response->assertOk()->assertJsonStructure(['peerComparisons']);
+        $this->assertSame([], $response->json('peerComparisons'));
+    }
+
+    public function test_web_report_page_receives_peer_comparisons_key(): void
+    {
+        $report = $this->reportedAssessment();
+
+        $response = $this->get("/reports/{$report->token}");
+
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page
+            ->component('Reports/Show')
+            ->has('report.peerComparisons')
+        );
+    }
 }

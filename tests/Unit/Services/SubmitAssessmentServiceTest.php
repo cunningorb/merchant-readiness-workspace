@@ -4,6 +4,8 @@ namespace Tests\Unit\Services;
 
 use App\Models\Assessment;
 use App\Models\AssessmentAnswer;
+use App\Models\BenchmarkSet;
+use App\Models\BenchmarkValue;
 use App\Services\SubmitAssessmentService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
@@ -40,6 +42,48 @@ class SubmitAssessmentServiceTest extends TestCase
         }
 
         return $assessment->fresh(['answers']);
+    }
+
+    private function seedGlobalBenchmarks(): BenchmarkSet
+    {
+        $set = BenchmarkSet::factory()->create([
+            'is_active' => true,
+            'effective_from' => null,
+            'effective_to' => null,
+        ]);
+
+        BenchmarkValue::factory()->for($set)->create([
+            'metric_key' => 'return_window_days',
+            'industry' => null,
+            'platform' => null,
+            'annual_order_volume_min' => null,
+            'annual_order_volume_max' => null,
+            'minimum_value' => 30,
+            'maximum_value' => 45,
+            'unit' => 'days',
+        ]);
+        BenchmarkValue::factory()->for($set)->create([
+            'metric_key' => 'manual_processing_hours_per_week',
+            'industry' => null,
+            'platform' => null,
+            'annual_order_volume_min' => null,
+            'annual_order_volume_max' => null,
+            'minimum_value' => 3,
+            'maximum_value' => 8,
+            'unit' => 'hours_per_week',
+        ]);
+        BenchmarkValue::factory()->for($set)->create([
+            'metric_key' => 'catalog_sku_count',
+            'industry' => null,
+            'platform' => null,
+            'annual_order_volume_min' => null,
+            'annual_order_volume_max' => null,
+            'minimum_value' => 500,
+            'maximum_value' => 10000,
+            'unit' => 'sku_count',
+        ]);
+
+        return $set;
     }
 
     public function test_submits_a_complete_assessment_and_persists_score_and_recommendations(): void
@@ -129,5 +173,39 @@ class SubmitAssessmentServiceTest extends TestCase
         $this->assertSame('submitted', $result->status);
         $this->assertCount(0, $result->opportunities);
         $this->assertDatabaseCount('assessment_opportunities', 0);
+    }
+
+    public function test_submit_persists_ranked_benchmark_comparisons_with_sort_order_and_benchmark_set_id(): void
+    {
+        $set = $this->seedGlobalBenchmarks();
+        $assessment = $this->completeAssessment();
+
+        $result = app(SubmitAssessmentService::class)->submit($assessment);
+
+        $this->assertCount(3, $result->benchmarkComparisons);
+        $this->assertSame(
+            ['return_window_days', 'manual_processing_hours_per_week', 'catalog_sku_count'],
+            $result->benchmarkComparisons->pluck('metric_key')->all()
+        );
+        $this->assertSame([0, 1, 2], $result->benchmarkComparisons->pluck('sort_order')->all());
+        $this->assertTrue($result->benchmarkComparisons->every(fn ($comparison) => $comparison->benchmark_set_id === $set->id));
+        $this->assertDatabaseCount('assessment_benchmark_comparisons', 3);
+        $this->assertDatabaseHas('assessment_benchmark_comparisons', [
+            'assessment_id' => $assessment->id,
+            'metric_key' => 'return_window_days',
+            'benchmark_set_id' => $set->id,
+            'sort_order' => 0,
+        ]);
+    }
+
+    public function test_submit_succeeds_with_zero_benchmark_comparisons_when_no_benchmark_sets_exist(): void
+    {
+        $assessment = $this->completeAssessment();
+
+        $result = app(SubmitAssessmentService::class)->submit($assessment);
+
+        $this->assertSame('submitted', $result->status);
+        $this->assertCount(0, $result->benchmarkComparisons);
+        $this->assertDatabaseCount('assessment_benchmark_comparisons', 0);
     }
 }

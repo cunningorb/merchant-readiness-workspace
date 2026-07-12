@@ -215,6 +215,28 @@ class WorkspaceTest extends TestCase
         );
     }
 
+    public function test_show_includes_peer_comparisons_key(): void
+    {
+        $user = User::factory()->create();
+        $assessment = Assessment::factory()->create([
+            'status' => 'submitted',
+            'submitted_at' => now(),
+            'overall_score' => 72,
+            'overall_tier' => 'Established',
+            'section_scores' => ['return_policy' => ['score' => 72, 'tier' => 'Established']],
+        ]);
+        Report::factory()->for($assessment)->create(['published_at' => now()]);
+
+        $response = $this->actingAs($user)->get("/dashboard/assessments/{$assessment->id}");
+
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page
+            ->component('Workspace/Show')
+            ->has('report.peerComparisons')
+            ->where('report.peerComparisons', [])
+        );
+    }
+
     public function test_show_creates_missing_report_for_submitted_assessment_without_one(): void
     {
         $user = User::factory()->create();

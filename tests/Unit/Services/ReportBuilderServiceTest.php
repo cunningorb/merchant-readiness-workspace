@@ -4,7 +4,9 @@ namespace Tests\Unit\Services;
 
 use App\Models\Assessment;
 use App\Models\AssessmentAnswer;
+use App\Models\AssessmentBenchmarkComparison;
 use App\Models\AssessmentOpportunity;
+use App\Models\BenchmarkSet;
 use App\Models\Merchant;
 use App\Models\Recommendation;
 use App\Services\ReportBuilderService;
@@ -432,5 +434,135 @@ class ReportBuilderServiceTest extends TestCase
         $payload = $service->buildPayload($report);
 
         $this->assertSame(['this_week' => [], 'plan_next' => []], $payload['actionPlan']);
+    }
+
+    // --- peerComparisons -------------------------------------------------------
+
+    public function test_build_payload_peer_comparisons_shape_and_content_from_persisted_rows(): void
+    {
+        $assessment = Assessment::factory()->create();
+        $set = BenchmarkSet::factory()->create([
+            'version' => '2026.1',
+            'source_type' => 'illustrative',
+            'source_label' => 'Illustrative benchmark',
+            'methodology' => 'Configured illustrative reference ranges.',
+        ]);
+
+        AssessmentBenchmarkComparison::factory()->for($assessment)->for($set, 'benchmarkSet')->create([
+            'metric_key' => 'return_window_days',
+            'label' => 'Return window',
+            'merchant_value' => 14,
+            'minimum_value' => 30,
+            'maximum_value' => 45,
+            'unit' => 'days',
+            'interpretation' => '14 days is below the Illustrative benchmark range of 30–45 days.',
+            'source_type' => 'illustrative',
+            'source_label' => 'Illustrative benchmark',
+            'methodology' => 'Configured illustrative reference ranges.',
+            'benchmark_version' => '2026.1',
+            'sort_order' => 0,
+        ]);
+        AssessmentBenchmarkComparison::factory()->for($assessment)->for($set, 'benchmarkSet')->create([
+            'metric_key' => 'manual_processing_hours_per_week',
+            'label' => 'Manual processing time',
+            'merchant_value' => 12,
+            'minimum_value' => 3,
+            'maximum_value' => 8,
+            'unit' => 'hours_per_week',
+            'interpretation' => '12 hrs/week is above the Illustrative benchmark range of 3–8 hrs/week.',
+            'source_type' => 'illustrative',
+            'source_label' => 'Illustrative benchmark',
+            'methodology' => 'Configured illustrative reference ranges.',
+            'benchmark_version' => '2026.1',
+            'sort_order' => 1,
+        ]);
+        AssessmentBenchmarkComparison::factory()->for($assessment)->for($set, 'benchmarkSet')->create([
+            'metric_key' => 'catalog_sku_count',
+            'label' => 'Catalog size',
+            'merchant_value' => 2750,
+            'minimum_value' => 500,
+            'maximum_value' => 10000,
+            'unit' => 'sku_count',
+            'interpretation' => '2,750 SKUs is within the Illustrative benchmark range of 500–10,000 SKUs.',
+            'source_type' => 'illustrative',
+            'source_label' => 'Illustrative benchmark',
+            'methodology' => 'Configured illustrative reference ranges.',
+            'benchmark_version' => '2026.1',
+            'sort_order' => 2,
+        ]);
+
+        $service = app(ReportBuilderService::class);
+        $report = $service->createForAssessment($assessment);
+        $payload = $service->buildPayload($report);
+
+        $this->assertCount(3, $payload['peerComparisons']);
+        $this->assertSame(
+            ['return_window_days', 'manual_processing_hours_per_week', 'catalog_sku_count'],
+            array_column($payload['peerComparisons'], 'metric_key')
+        );
+
+        $returnWindow = $payload['peerComparisons'][0];
+        $this->assertSame([
+            'metric_key', 'label', 'merchant_value', 'merchant_value_formatted',
+            'minimum_value', 'maximum_value', 'unit', 'range_formatted',
+            'interpretation', 'source_type', 'source_label', 'methodology', 'benchmark_version',
+        ], array_keys($returnWindow));
+        $this->assertSame('Return window', $returnWindow['label']);
+        $this->assertEquals(14.0, $returnWindow['merchant_value']);
+        $this->assertSame('14 days', $returnWindow['merchant_value_formatted']);
+        $this->assertEquals(30.0, $returnWindow['minimum_value']);
+        $this->assertEquals(45.0, $returnWindow['maximum_value']);
+        $this->assertSame('days', $returnWindow['unit']);
+        $this->assertSame('30–45 days', $returnWindow['range_formatted']);
+        $this->assertSame('illustrative', $returnWindow['source_type']);
+        $this->assertSame('Illustrative benchmark', $returnWindow['source_label']);
+        $this->assertSame('Configured illustrative reference ranges.', $returnWindow['methodology']);
+        $this->assertSame('2026.1', $returnWindow['benchmark_version']);
+
+        $manualHours = $payload['peerComparisons'][1];
+        $this->assertSame('12 hrs/week', $manualHours['merchant_value_formatted']);
+        $this->assertSame('3–8 hrs/week', $manualHours['range_formatted']);
+
+        $catalog = $payload['peerComparisons'][2];
+        $this->assertSame('2,750 SKUs', $catalog['merchant_value_formatted']);
+        $this->assertSame('500–10,000 SKUs', $catalog['range_formatted']);
+    }
+
+    public function test_build_payload_peer_comparisons_is_empty_array_when_none_exist(): void
+    {
+        $assessment = Assessment::factory()->create();
+
+        $service = app(ReportBuilderService::class);
+        $report = $service->createForAssessment($assessment);
+        $payload = $service->buildPayload($report);
+
+        $this->assertSame([], $payload['peerComparisons']);
+
+        // existing keys are intact (backwards compatibility)
+        $this->assertArrayHasKey('merchant', $payload);
+        $this->assertArrayHasKey('assessment', $payload);
+        $this->assertArrayHasKey('recommendations', $payload);
+        $this->assertArrayHasKey('heroOpportunity', $payload);
+    }
+
+    public function test_build_payload_peer_comparisons_backwards_compatible_for_legacy_assessment(): void
+    {
+        // A legacy assessment submitted before this milestone has no
+        // assessment_benchmark_comparisons rows at all; the payload must
+        // still build successfully with an empty peerComparisons array.
+        $assessment = Assessment::factory()->create([
+            'overall_score' => 72,
+            'overall_tier' => 'Established',
+            'section_scores' => ['return_policy' => ['score' => 72, 'tier' => 'Established']],
+        ]);
+        Recommendation::factory()->for($assessment)->create(['title' => 'Legacy recommendation']);
+
+        $service = app(ReportBuilderService::class);
+        $report = $service->createForAssessment($assessment);
+        $payload = $service->buildPayload($report);
+
+        $this->assertSame([], $payload['peerComparisons']);
+        $this->assertSame(72, $payload['assessment']['overall_score']);
+        $this->assertCount(1, $payload['recommendations']);
     }
 }
