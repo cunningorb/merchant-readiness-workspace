@@ -68,4 +68,9 @@ class Assessment extends Model
     {
         return $this->hasMany(AssessmentBenchmarkComparison::class)->orderBy('sort_order');
     }
+
+    public function dataImports(): HasMany
+    {
+        return $this->hasMany(DataImport::class);
+    }
 }

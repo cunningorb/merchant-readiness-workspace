@@ -3,6 +3,8 @@
 namespace Tests\Unit\Models;
 
 use App\Models\Assessment;
+use App\Models\AssessmentAnswer;
+use App\Models\DataImport;
 use App\Models\Merchant;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -40,7 +42,7 @@ class AssessmentTest extends TestCase
     public function test_answer_value_returns_stored_value_for_question_key(): void
     {
         $assessment = Assessment::factory()->create();
-        \App\Models\AssessmentAnswer::factory()->for($assessment)->create([
+        AssessmentAnswer::factory()->for($assessment)->create([
             'question_key' => 'return_policy.window_days',
             'section' => 'return_policy',
             'value' => '31-60 days',
@@ -75,5 +77,13 @@ class AssessmentTest extends TestCase
         $this->assertSame('Established', $fresh->overall_tier);
         $this->assertIsArray($fresh->section_scores);
         $this->assertSame(80, $fresh->section_scores['return_policy']['score']);
+    }
+
+    public function test_assessment_has_many_data_imports(): void
+    {
+        $assessment = Assessment::factory()->create();
+        $import = DataImport::factory()->for($assessment)->create();
+
+        $this->assertTrue($assessment->fresh()->dataImports->contains($import));
     }
 }

@@ -31,4 +31,34 @@ class Merchant extends Model
     {
         return $this->hasMany(Assessment::class);
     }
+
+    public function dataConnections(): HasMany
+    {
+        return $this->hasMany(DataConnection::class);
+    }
+
+    public function products(): HasMany
+    {
+        return $this->hasMany(MerchantProduct::class);
+    }
+
+    public function orderMetrics(): HasMany
+    {
+        return $this->hasMany(MerchantOrderMetric::class);
+    }
+
+    public function returnMetrics(): HasMany
+    {
+        return $this->hasMany(MerchantReturnMetric::class);
+    }
+
+    public function inventoryMetrics(): HasMany
+    {
+        return $this->hasMany(MerchantInventoryMetric::class);
+    }
+
+    public function locationMetrics(): HasMany
+    {
+        return $this->hasMany(MerchantLocationMetric::class);
+    }
 }
