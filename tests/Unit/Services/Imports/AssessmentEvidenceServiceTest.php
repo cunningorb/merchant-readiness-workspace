@@ -154,6 +154,30 @@ class AssessmentEvidenceServiceTest extends TestCase
         $this->assertSame(1029, $record->importedValue);
     }
 
+    public function test_monthly_order_volume_scoped_to_latest_import_only(): void
+    {
+        $assessment = Assessment::factory()->create();
+        $olderImport = $this->completedImport($assessment, ['created_at' => now()->subDays(2)]);
+        $latestImport = $this->completedImport($assessment, ['created_at' => now()]);
+
+        MerchantOrderMetric::factory()->create([
+            'merchant_id' => $assessment->merchant_id,
+            'assessment_id' => $assessment->id,
+            'source_import_id' => $olderImport->id,
+            'annualized_order_volume' => 24000,
+        ]);
+        MerchantOrderMetric::factory()->create([
+            'merchant_id' => $assessment->merchant_id,
+            'assessment_id' => $assessment->id,
+            'source_import_id' => $latestImport->id,
+            'annualized_order_volume' => 66000,
+        ]);
+
+        $record = $this->service()->mergedEvidence($assessment->fresh(['answers']))['business.monthly_order_volume'];
+
+        $this->assertSame(5500, $record->importedValue);
+    }
+
     // --- catalog.sku_count: all four states ---------------------------------
 
     public function test_sku_count_answer_only(): void
