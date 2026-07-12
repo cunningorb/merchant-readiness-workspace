@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Assessment;
+use App\Models\AssessmentBenchmarkComparison;
 use App\Models\Merchant;
 use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
@@ -20,6 +21,7 @@ class DatabaseSeederTest extends TestCase
         $this->assertSame(1, User::where('role', 'admin')->count());
         $this->assertSame(3, Merchant::where('is_demo', true)->count());
         $this->assertSame(3, Assessment::where('status', 'submitted')->count());
+        $this->assertGreaterThan(0, AssessmentBenchmarkComparison::count());
     }
 
     public function test_database_seeder_is_safe_to_run_more_than_once(): void

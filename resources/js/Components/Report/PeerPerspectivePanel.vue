@@ -14,6 +14,16 @@ const props = defineProps({
 // benchmark set, so the disclosure is driven by the first comparison's
 // fields; if future work ever mixes sets this would need per-group handling.
 const methodologySource = computed(() => props.comparisons[0] ?? null);
+
+function humanizeSourceType(sourceType) {
+    if (!sourceType) {
+        return null;
+    }
+
+    const spaced = String(sourceType).replaceAll('_', ' ');
+
+    return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+}
 </script>
 
 <template>
@@ -53,6 +63,7 @@ const methodologySource = computed(() => props.comparisons[0] ?? null);
                         class="inline-flex shrink-0 items-center self-start rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-600"
                     >
                         {{ item.source_label }}
+                        <span v-if="item.source_type"> · {{ humanizeSourceType(item.source_type) }}</span>
                     </span>
                 </div>
                 <p class="mt-3 text-sm text-slate-600">{{ item.interpretation }}</p>

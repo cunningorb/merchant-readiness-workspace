@@ -36,16 +36,26 @@ class BenchmarkResolver
         $annualOrderVolume = $context['annual_order_volume'] ?? null;
 
         if ($industry !== null) {
-            $tier1 = $candidates->first(fn (BenchmarkValue $value) => $this->industryMatches($value, $industry)
-                && $this->volumeMatches($value, $annualOrderVolume)
-                && $this->platformMatches($value, $platform));
+            $tier1 = $this->firstBySpecificity(
+                $candidates,
+                fn (BenchmarkValue $value) => $this->industryMatches($value, $industry)
+                    && $this->volumeMatches($value, $annualOrderVolume)
+                    && $this->platformMatches($value, $platform),
+                $platform,
+                considerPlatform: true,
+            );
 
             if ($tier1 !== null) {
                 return $tier1;
             }
 
-            $tier2 = $candidates->first(fn (BenchmarkValue $value) => $this->industryMatches($value, $industry)
-                && $this->volumeMatches($value, $annualOrderVolume));
+            $tier2 = $this->firstBySpecificity(
+                $candidates,
+                fn (BenchmarkValue $value) => $this->industryMatches($value, $industry)
+                    && $this->volumeMatches($value, $annualOrderVolume),
+                $platform,
+                considerPlatform: false,
+            );
 
             if ($tier2 !== null) {
                 return $tier2;
@@ -95,6 +105,32 @@ class BenchmarkResolver
         }
 
         return $platform !== null && $value->platform === $platform;
+    }
+
+    /**
+     * @param  Collection<int, BenchmarkValue>  $candidates
+     */
+    private function firstBySpecificity(Collection $candidates, callable $matches, ?string $platform, bool $considerPlatform): ?BenchmarkValue
+    {
+        return $candidates
+            ->filter($matches)
+            ->sortByDesc(fn (BenchmarkValue $value) => $this->specificityScore($value, $platform, $considerPlatform))
+            ->first();
+    }
+
+    private function specificityScore(BenchmarkValue $value, ?string $platform, bool $considerPlatform): int
+    {
+        $score = 0;
+
+        if ($considerPlatform && $platform !== null && $value->platform === $platform) {
+            $score += 20;
+        }
+
+        if ($value->annual_order_volume_min !== null && $value->annual_order_volume_max !== null) {
+            $score += 10;
+        }
+
+        return $score;
     }
 
     private function volumeMatches(BenchmarkValue $value, ?float $annualOrderVolume): bool

@@ -170,6 +170,42 @@ class BenchmarkComparisonServiceTest extends TestCase
         $this->assertCount(0, $results);
     }
 
+    public function test_skips_metric_when_resolved_benchmark_has_inverted_range(): void
+    {
+        $set = $this->benchmarkSet();
+        $this->benchmarkValue($set, [
+            'metric_key' => 'return_window_days',
+            'minimum_value' => 45,
+            'maximum_value' => 30,
+            'unit' => 'days',
+        ]);
+
+        $assessment = Assessment::factory()->create();
+        $this->answer($assessment, 'return_policy.window_days', 'return_policy', '15-30 days');
+
+        $results = $this->compare($assessment);
+
+        $this->assertCount(0, $results);
+    }
+
+    public function test_skips_metric_when_resolved_benchmark_has_invalid_source_type(): void
+    {
+        $set = $this->benchmarkSet(['source_type' => 'not_a_real_source']);
+        $this->benchmarkValue($set, [
+            'metric_key' => 'return_window_days',
+            'minimum_value' => 30,
+            'maximum_value' => 45,
+            'unit' => 'days',
+        ]);
+
+        $assessment = Assessment::factory()->create();
+        $this->answer($assessment, 'return_policy.window_days', 'return_policy', '15-30 days');
+
+        $results = $this->compare($assessment);
+
+        $this->assertCount(0, $results);
+    }
+
     public function test_skips_only_the_metric_with_no_matching_benchmark_while_keeping_others(): void
     {
         $set = $this->benchmarkSet();

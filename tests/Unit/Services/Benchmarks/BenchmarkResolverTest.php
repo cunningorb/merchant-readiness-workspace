@@ -130,6 +130,66 @@ class BenchmarkResolverTest extends TestCase
         $this->assertSame($tier2->id, $result->id);
     }
 
+    public function test_tier1_prefers_platform_specific_row_over_generic_platform_row(): void
+    {
+        $set = $this->activeSet();
+
+        $this->value($set, [
+            'industry' => 'apparel',
+            'platform' => null,
+            'annual_order_volume_min' => 1000,
+            'annual_order_volume_max' => 100000,
+            'minimum_value' => 3,
+            'maximum_value' => 4,
+        ]);
+        $specific = $this->value($set, [
+            'industry' => 'apparel',
+            'platform' => 'Shopify',
+            'annual_order_volume_min' => 1000,
+            'annual_order_volume_max' => 100000,
+            'minimum_value' => 1,
+            'maximum_value' => 2,
+        ]);
+
+        $result = $this->resolver()->resolve('return_window_days', [
+            'industry' => 'apparel',
+            'platform' => 'Shopify',
+            'annual_order_volume' => 50000,
+        ]);
+
+        $this->assertSame($specific->id, $result->id);
+    }
+
+    public function test_tier2_prefers_bounded_volume_row_over_unconstrained_volume_row(): void
+    {
+        $set = $this->activeSet();
+
+        $this->value($set, [
+            'industry' => 'apparel',
+            'platform' => 'WooCommerce',
+            'annual_order_volume_min' => null,
+            'annual_order_volume_max' => null,
+            'minimum_value' => 3,
+            'maximum_value' => 4,
+        ]);
+        $bounded = $this->value($set, [
+            'industry' => 'apparel',
+            'platform' => 'WooCommerce',
+            'annual_order_volume_min' => 1000,
+            'annual_order_volume_max' => 100000,
+            'minimum_value' => 1,
+            'maximum_value' => 2,
+        ]);
+
+        $result = $this->resolver()->resolve('return_window_days', [
+            'industry' => 'apparel',
+            'platform' => 'Shopify',
+            'annual_order_volume' => 50000,
+        ]);
+
+        $this->assertSame($bounded->id, $result->id);
+    }
+
     // --- tier 3: industry match only, volume and platform ignored --------------
 
     public function test_tier3_industry_match_when_volume_out_of_range(): void

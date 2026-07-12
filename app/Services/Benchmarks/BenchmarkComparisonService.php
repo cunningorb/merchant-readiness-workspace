@@ -58,9 +58,9 @@ class BenchmarkComparisonService
 
             $benchmarkValue = $this->resolver->resolve($metricKey, $context);
 
-            // A benchmark row with no usable range is not a usable benchmark:
-            // there is nothing to compare against, so skip rather than guess.
-            if ($benchmarkValue === null || $benchmarkValue->minimum_value === null || $benchmarkValue->maximum_value === null) {
+            // A malformed benchmark row is not a usable benchmark: skip rather
+            // than blocking assessment submission because configured data is bad.
+            if (! $this->hasUsableBenchmark($benchmarkValue)) {
                 continue;
             }
 
@@ -94,6 +94,19 @@ class BenchmarkComparisonService
             benchmarkVersion: $benchmarkSet->version,
             benchmarkSetId: $benchmarkSet->id,
         );
+    }
+
+    private function hasUsableBenchmark(?BenchmarkValue $benchmarkValue): bool
+    {
+        if ($benchmarkValue === null || $benchmarkValue->minimum_value === null || $benchmarkValue->maximum_value === null) {
+            return false;
+        }
+
+        if ((float) $benchmarkValue->minimum_value > (float) $benchmarkValue->maximum_value) {
+            return false;
+        }
+
+        return BenchmarkSourceType::tryFrom($benchmarkValue->benchmarkSet->source_type) !== null;
     }
 
     /**

@@ -50,15 +50,16 @@ describe('PeerPerspectivePanel', () => {
         expect(wrapper.text()).toContain('Peer perspective');
     });
 
-    it('shows each comparison merchant value, range, interpretation and source label', () => {
-        const wrapper = mountPanel([comparison()]);
+    it('shows each comparison merchant value, range, interpretation, source label and source type', () => {
+        const wrapper = mountPanel([comparison({ source_label: 'Reference cohort', source_type: 'external_reference' })]);
         const row = wrapper.get('[data-testid="peer-comparison-row"]');
 
         expect(row.text()).toContain('Return window');
         expect(row.text()).toContain('30 days');
         expect(row.text()).toContain('15–45 days');
         expect(row.text()).toContain('Your 30-day window sits within the common range.');
-        expect(row.text()).toContain('Illustrative benchmark');
+        expect(row.text()).toContain('Reference cohort');
+        expect(row.text()).toContain('External reference');
     });
 
     it('renders exactly one row per comparison passed', () => {
