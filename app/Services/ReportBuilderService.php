@@ -274,11 +274,17 @@ class ReportBuilderService
      * recalculates - an empty collection (legacy assessments, or an
      * assessment where nothing resolved) is a normal, valid state.
      *
+     * Capped at 3 here defensively: "show at most 3 comparisons" is a
+     * binding acceptance criterion, and this is the cheapest place to
+     * enforce it regardless of how many rows end up persisted upstream.
+     *
      * @param  Collection<int, AssessmentBenchmarkComparison>  $comparisons
      */
     private function peerComparisons(Collection $comparisons): array
     {
-        return $comparisons->map(fn (AssessmentBenchmarkComparison $comparison) => $this->peerComparisonItem($comparison))->all();
+        return $comparisons->take(3)
+            ->map(fn (AssessmentBenchmarkComparison $comparison) => $this->peerComparisonItem($comparison))
+            ->all();
     }
 
     private function peerComparisonItem(AssessmentBenchmarkComparison $comparison): array

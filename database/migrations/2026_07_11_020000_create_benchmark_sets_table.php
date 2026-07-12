@@ -19,6 +19,8 @@ return new class extends Migration
             $table->timestamp('effective_to')->nullable();
             $table->boolean('is_active')->default(true);
             $table->timestamps();
+
+            $table->unique(['name', 'version']);
         });
     }
 

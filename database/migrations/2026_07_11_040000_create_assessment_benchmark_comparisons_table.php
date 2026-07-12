@@ -11,7 +11,7 @@ return new class extends Migration
         Schema::create('assessment_benchmark_comparisons', function (Blueprint $table) {
             $table->id();
             $table->foreignUlid('assessment_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('benchmark_set_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('benchmark_set_id')->nullable()->constrained()->nullOnDelete();
             $table->string('metric_key');
             $table->string('label');
             $table->decimal('merchant_value', 14, 2);

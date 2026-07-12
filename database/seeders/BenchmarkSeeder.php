@@ -4,7 +4,9 @@ namespace Database\Seeders;
 
 use App\Enums\BenchmarkSourceType;
 use App\Models\BenchmarkSet;
+use Illuminate\Database\QueryException;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
 
 class BenchmarkSeeder extends Seeder
 {
@@ -12,31 +14,70 @@ class BenchmarkSeeder extends Seeder
 
     private const SET_VERSION = '1.0';
 
+    /**
+     * Runs on every production container boot (not a one-time migration), so
+     * this must be both crash-safe and concurrency-safe:
+     *
+     * - The set + its values are created inside a single transaction, so a
+     *   process death mid-seed leaves no partial rows behind. The next boot's
+     *   alreadySeeded() check will then correctly see nothing and retry.
+     * - A unique index on benchmark_sets(name, version) means two containers
+     *   racing past the alreadySeeded() check at the same time cannot both
+     *   succeed in creating the set: the loser's insert throws a unique
+     *   constraint violation, which is treated the same as "already exists".
+     */
     public function run(): void
     {
-        if (BenchmarkSet::where('name', self::SET_NAME)->where('version', self::SET_VERSION)->exists()) {
+        if ($this->alreadySeeded()) {
             return;
         }
 
-        $benchmarkSet = BenchmarkSet::create([
-            'name' => self::SET_NAME,
-            'version' => self::SET_VERSION,
-            'source_type' => BenchmarkSourceType::Illustrative->value,
-            'source_label' => 'Illustrative benchmark',
-            'methodology' => 'These are configured, illustrative reference ranges, not measured industry data. '
-                .'They are used until the product has an authoritative proprietary dataset.',
-            'is_active' => true,
-        ]);
+        try {
+            DB::transaction(function () {
+                $benchmarkSet = BenchmarkSet::create([
+                    'name' => self::SET_NAME,
+                    'version' => self::SET_VERSION,
+                    'source_type' => BenchmarkSourceType::Illustrative->value,
+                    'source_label' => 'Illustrative benchmark',
+                    'methodology' => 'These are configured, illustrative reference ranges, not measured industry data. '
+                        .'They are used until the product has an authoritative proprietary dataset.',
+                    'is_active' => true,
+                ]);
 
-        foreach ($this->values() as $value) {
-            $benchmarkSet->values()->create($value);
+                foreach ($this->values() as $value) {
+                    $benchmarkSet->values()->create($value);
+                }
+            });
+        } catch (QueryException $exception) {
+            if (! $this->isUniqueConstraintViolation($exception)) {
+                throw $exception;
+            }
         }
+    }
+
+    protected function alreadySeeded(): bool
+    {
+        return BenchmarkSet::where('name', self::SET_NAME)->where('version', self::SET_VERSION)->exists();
+    }
+
+    private function isUniqueConstraintViolation(QueryException $exception): bool
+    {
+        // SQLSTATE 23000 covers all integrity constraint violations (unique,
+        // not-null, foreign key), so it alone isn't specific enough - a
+        // genuine bug (e.g. a bad seed value violating a NOT NULL column)
+        // must still propagate rather than being silently swallowed forever.
+        // Both SQLite ("UNIQUE constraint failed") and MySQL (whose
+        // duplicate-entry message names the offending
+        // "..._unique" index by Laravel's default naming convention)
+        // mention "unique" specifically for this violation.
+        return $exception->getCode() === '23000'
+            && str_contains(strtolower($exception->getMessage()), 'unique');
     }
 
     /**
      * @return array<int, array{metric_key: string, industry: ?string, minimum_value: float, maximum_value: float, unit: string}>
      */
-    private function values(): array
+    protected function values(): array
     {
         return [
             ['metric_key' => 'return_window_days', 'industry' => 'apparel', 'minimum_value' => 30, 'maximum_value' => 45, 'unit' => 'days'],

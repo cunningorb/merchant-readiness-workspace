@@ -528,6 +528,32 @@ class ReportBuilderServiceTest extends TestCase
         $this->assertSame('500–10,000 SKUs', $catalog['range_formatted']);
     }
 
+    public function test_build_payload_peer_comparisons_caps_at_three_even_if_four_persisted(): void
+    {
+        // Defends the binding "show at most 3 comparisons" acceptance
+        // criterion even if a 4th metric is ever added upstream and ends up
+        // with 4+ persisted AssessmentBenchmarkComparison rows.
+        $assessment = Assessment::factory()->create();
+        $set = BenchmarkSet::factory()->create();
+
+        foreach (['return_window_days', 'manual_processing_hours_per_week', 'catalog_sku_count', 'fourth_metric'] as $index => $metricKey) {
+            AssessmentBenchmarkComparison::factory()->for($assessment)->for($set, 'benchmarkSet')->create([
+                'metric_key' => $metricKey,
+                'sort_order' => $index,
+            ]);
+        }
+
+        $service = app(ReportBuilderService::class);
+        $report = $service->createForAssessment($assessment);
+        $payload = $service->buildPayload($report);
+
+        $this->assertCount(3, $payload['peerComparisons']);
+        $this->assertSame(
+            ['return_window_days', 'manual_processing_hours_per_week', 'catalog_sku_count'],
+            array_column($payload['peerComparisons'], 'metric_key')
+        );
+    }
+
     public function test_build_payload_peer_comparisons_is_empty_array_when_none_exist(): void
     {
         $assessment = Assessment::factory()->create();
