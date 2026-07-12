@@ -63,4 +63,9 @@ class Assessment extends Model
     {
         return $this->hasOne(Report::class);
     }
+
+    public function benchmarkComparisons(): HasMany
+    {
+        return $this->hasMany(AssessmentBenchmarkComparison::class)->orderBy('sort_order');
+    }
 }
