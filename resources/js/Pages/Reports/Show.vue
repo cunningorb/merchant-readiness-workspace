@@ -4,6 +4,7 @@ import AssessmentResults from '../Assessment/AssessmentResults.vue';
 import ActionPlan from '../../Components/Report/ActionPlan.vue';
 import CalculationModal from '../../Components/Report/CalculationModal.vue';
 import OpportunityHero from '../../Components/Report/OpportunityHero.vue';
+import PeerPerspectivePanel from '../../Components/Report/PeerPerspectivePanel.vue';
 import RecommendationCard from '../../Components/Report/RecommendationCard.vue';
 import RecommendationsDisclosure from '../../Components/Report/RecommendationsDisclosure.vue';
 import SupportingMetricStrip from '../../Components/Report/SupportingMetricStrip.vue';
@@ -148,6 +149,8 @@ function printReport() {
                     :calculation-explanations="explanations"
                     @see-calculation="openCalculation"
                 />
+
+                <PeerPerspectivePanel :comparisons="report.peerComparisons ?? []" />
 
                 <ActionPlan :plan="report.actionPlan" />
 

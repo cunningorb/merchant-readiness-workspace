@@ -83,6 +83,23 @@ const report = {
         this_week: ['Enable instant exchanges', 'Automate return label generation'],
         plan_next: ['Clarify your return policy', 'Publish a returns FAQ'],
     },
+    peerComparisons: [
+        {
+            metric_key: 'return_window_days',
+            label: 'Return window',
+            merchant_value: 30,
+            merchant_value_formatted: '30 days',
+            minimum_value: 15,
+            maximum_value: 45,
+            unit: 'days',
+            range_formatted: '15–45 days',
+            interpretation: 'Your 30-day window sits within the common range.',
+            source_type: 'illustrative',
+            source_label: 'Illustrative benchmark',
+            methodology: 'These are configured, illustrative reference ranges, not measured industry data.',
+            benchmark_version: '1.0',
+        },
+    ],
 };
 
 const catalog = [
@@ -163,6 +180,30 @@ describe('Reports/Show', () => {
         expect(diagnosticIndex).toBeGreaterThan(heroIndex);
         expect(wrapper.text()).toContain('Score breakdown');
         expect(wrapper.text()).toContain('Capability mapping');
+    });
+
+    it('places the peer perspective section between the recommendations disclosure and the action plan', () => {
+        const wrapper = mountShow();
+        const html = wrapper.html();
+
+        const disclosureIndex = html.indexOf('View all 2 recommendations');
+        const peerIndex = html.indexOf('data-testid="peer-perspective"');
+        const actionPlanIndex = html.indexOf('action-plan-heading');
+
+        expect(peerIndex).toBeGreaterThan(disclosureIndex);
+        expect(actionPlanIndex).toBeGreaterThan(peerIndex);
+        expect(wrapper.text()).toContain('Peer perspective');
+        expect(wrapper.text()).toContain('Illustrative benchmark');
+    });
+
+    it('omits the peer perspective section entirely when there are no comparisons', () => {
+        wrapper = mount(Show, {
+            props: { report: { ...report, peerComparisons: [] }, catalog },
+            attachTo: document.body,
+        });
+
+        expect(wrapper.find('[data-testid="peer-perspective"]').exists()).toBe(false);
+        expect(wrapper.text()).not.toContain('Peer perspective');
     });
 
     it('opens the calculation modal from a See calculation trigger and shows the matching explanation', async () => {
