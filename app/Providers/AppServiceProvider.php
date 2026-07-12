@@ -2,6 +2,10 @@
 
 namespace App\Providers;
 
+use App\Contracts\AssessmentScorer;
+use App\Services\Imports\ImportProviderRegistry;
+use App\Services\ReadinessScoringService;
+use App\Services\RecommendationEngine;
 use Illuminate\Support\Facades\Vite;
 use Illuminate\Support\ServiceProvider;
 
@@ -12,25 +16,30 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        $this->app->singleton(\App\Services\ReadinessScoringService::class, function ($app) {
+        $this->app->singleton(ReadinessScoringService::class, function ($app) {
             $scorers = array_map(
                 fn (string $class) => $app->make($class),
                 config('scoring.scorers'),
             );
 
-            return new \App\Services\ReadinessScoringService($scorers);
+            return new ReadinessScoringService($scorers);
         });
 
-        $this->app->bind(\App\Contracts\AssessmentScorer::class, \App\Services\ReadinessScoringService::class);
+        $this->app->bind(AssessmentScorer::class, ReadinessScoringService::class);
 
-        $this->app->singleton(\App\Services\RecommendationEngine::class, function ($app) {
+        $this->app->singleton(RecommendationEngine::class, function ($app) {
             $rules = array_map(
                 fn (string $class) => $app->make($class),
                 config('recommendations.rules'),
             );
 
-            return new \App\Services\RecommendationEngine($rules);
+            return new RecommendationEngine($rules);
         });
+
+        // Shared across the request and its queued jobs so a provider's importer
+        // registration (from later tasks' service providers) is visible to the
+        // jobs that consume it.
+        $this->app->singleton(ImportProviderRegistry::class);
     }
 
     /**
