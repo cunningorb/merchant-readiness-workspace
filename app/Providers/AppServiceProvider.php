@@ -3,6 +3,9 @@
 namespace App\Providers;
 
 use App\Contracts\AssessmentScorer;
+use App\Services\Imports\Csv\CsvCatalogImporter;
+use App\Services\Imports\Csv\CsvInventoryImporter;
+use App\Services\Imports\Csv\CsvOrderReturnImporter;
 use App\Services\Imports\Demo\DemoCatalogImporter;
 use App\Services\Imports\Demo\DemoInventoryImporter;
 use App\Services\Imports\Demo\DemoOrderReturnImporter;
@@ -52,14 +55,21 @@ class AppServiceProvider extends ServiceProvider
     {
         Vite::prefetch(concurrency: 3);
 
-        // Register the demo provider's importers. This is the only provider
-        // registered so far; real providers (Shopify, CSV, ...) register the
-        // same way from their own service providers in later milestones.
+        // Register each provider's importers. Real providers (Shopify, ...)
+        // register the same way from their own service providers in later
+        // milestones.
         $this->app->make(ImportProviderRegistry::class)->register(
             provider: 'demo',
             catalogImporter: $this->app->make(DemoCatalogImporter::class),
             orderReturnImporter: $this->app->make(DemoOrderReturnImporter::class),
             inventoryImporter: $this->app->make(DemoInventoryImporter::class),
+        );
+
+        $this->app->make(ImportProviderRegistry::class)->register(
+            provider: 'csv',
+            catalogImporter: $this->app->make(CsvCatalogImporter::class),
+            orderReturnImporter: $this->app->make(CsvOrderReturnImporter::class),
+            inventoryImporter: $this->app->make(CsvInventoryImporter::class),
         );
     }
 }
