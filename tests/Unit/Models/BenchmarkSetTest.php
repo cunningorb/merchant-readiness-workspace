@@ -5,6 +5,7 @@ namespace Tests\Unit\Models;
 use App\Models\BenchmarkSet;
 use App\Models\BenchmarkValue;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Tests\TestCase;
 
 class BenchmarkSetTest extends TestCase
@@ -36,8 +37,8 @@ class BenchmarkSetTest extends TestCase
 
         $fresh = $benchmarkSet->fresh();
 
-        $this->assertInstanceOf(\Illuminate\Support\Carbon::class, $fresh->effective_from);
-        $this->assertInstanceOf(\Illuminate\Support\Carbon::class, $fresh->effective_to);
+        $this->assertInstanceOf(Carbon::class, $fresh->effective_from);
+        $this->assertInstanceOf(Carbon::class, $fresh->effective_to);
     }
 
     public function test_factory_creates_valid_benchmark_set(): void
