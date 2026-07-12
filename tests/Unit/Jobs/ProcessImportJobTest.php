@@ -189,17 +189,25 @@ class ProcessImportJobTest extends TestCase
         $this->assertSame(['catalog'], $fresh->metadata['pending_data_types']);
     }
 
-    // --- race-safe finalization -------------------------------------------
+    // --- id-based finalization re-read ------------------------------------
 
     /**
-     * Two jobs for the same import can reach finalization having both observed
-     * the full pending list before either removed its own data type. A naive
-     * read-modify-write on a stale in-memory model would lose one removal and
-     * leave the import stuck (never finalized). finalizeDataType() re-reads the
-     * pending list from the row it locks inside the transaction, so the result
-     * is correct regardless of the two callers' stale snapshots.
+     * finalizeDataType() re-reads the DataImport fresh by id on each call
+     * rather than trusting a stale in-memory model handed to it by the caller.
+     * This test drives two calls sequentially, each holding its own stale
+     * snapshot taken while the pending list still held both data types, and
+     * proves the removals accumulate correctly: the first call removes only its
+     * own data type and does NOT finalize, and only the second call — the one
+     * that empties the pending list — finalizes the overall status.
+     *
+     * NOTE: this is a sequential, single-process test. It proves the id-based
+     * re-read behaviour, NOT protection against a true concurrent race. The
+     * actual concurrent-safety guard (lockForUpdate() inside a transaction) is
+     * covered separately by
+     * test_finalization_source_requests_a_row_lock_inside_a_transaction(),
+     * because SQLite cannot enact real row locks in this environment.
      */
-    public function test_finalization_is_safe_against_concurrent_stale_snapshots(): void
+    public function test_finalization_re_reads_the_pending_list_by_id_on_each_call(): void
     {
         $coordinator = new ImportCoordinator;
         $import = $this->import(['catalog', 'orders_returns']);
@@ -232,7 +240,13 @@ class ProcessImportJobTest extends TestCase
         $this->assertNotNull($fresh->completed_at);
     }
 
-    public function test_finalization_counts_errors_across_concurrent_failures(): void
+    /**
+     * Sequential companion to the re-read test above: each call increments the
+     * error count on the freshly re-read row, so two failing data types
+     * accumulate to two errors and the import ends Failed. Like its sibling this
+     * proves id-based accumulation, not concurrent-race protection.
+     */
+    public function test_finalization_accumulates_errors_across_repeated_calls(): void
     {
         $coordinator = new ImportCoordinator;
         $import = $this->import(['catalog', 'orders_returns']);
@@ -247,5 +261,40 @@ class ProcessImportJobTest extends TestCase
         $this->assertSame([], $fresh->metadata['pending_data_types']);
         $this->assertSame(2, $fresh->errors_count);
         $this->assertSame(ImportStatus::Failed->value, $fresh->status);
+    }
+
+    /**
+     * finalizeDataType()'s real concurrent-safety comes from taking a
+     * `FOR UPDATE` row lock inside a DB transaction. This project's local/CI
+     * database is SQLite, whose query grammar compiles lockForUpdate() to an
+     * empty string, so the lock is never actually enacted and NO behavioural
+     * test in this environment can observe a real row lock — the production
+     * guarantee rests on Postgres enforcing the lock. Because behavioural proof
+     * is impossible here, this test instead pins the guard's presence: it reads
+     * the source of ImportCoordinator::finalizeDataType() and asserts the lock
+     * is still requested inside a transaction. If a future refactor silently
+     * drops lockForUpdate() (or the surrounding transaction) from the
+     * finalization path, this test fails regardless of the database driver.
+     */
+    public function test_finalization_source_requests_a_row_lock_inside_a_transaction(): void
+    {
+        $method = new \ReflectionMethod(ImportCoordinator::class, 'finalizeDataType');
+        $lines = file($method->getFileName());
+        $source = implode('', array_slice(
+            $lines,
+            $method->getStartLine() - 1,
+            $method->getEndLine() - $method->getStartLine() + 1,
+        ));
+
+        $this->assertStringContainsString(
+            'DB::transaction',
+            $source,
+            'finalizeDataType() must run inside a DB transaction for the row lock to hold.',
+        );
+        $this->assertStringContainsString(
+            'lockForUpdate()',
+            $source,
+            'finalizeDataType() must lock the DataImport row FOR UPDATE; dropping this reintroduces the finalization race on production (Postgres).',
+        );
     }
 }

@@ -21,6 +21,12 @@ use Throwable;
  * race-safe hand-off to ImportCoordinator::finalizeDataType(). Jobs hold the
  * DataImport id (not the model) per Laravel convention so they reload fresh
  * state when they run.
+ *
+ * Race-safety here relies on lockForUpdate() inside a DB transaction; this
+ * project's local/CI database is SQLite, which does not enforce row-level
+ * locking, so this guard's real concurrent-safety is unverified by the
+ * automated test suite and depends on the production database (Postgres)
+ * actually enforcing it.
  */
 abstract class ProcessImportJob implements ShouldQueue
 {
