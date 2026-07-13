@@ -19,8 +19,6 @@ defineProps({
                 <div class="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm font-medium text-slate-600">
                     <Link href="/assessment" class="transition hover:text-blue-700">Assessment</Link>
                     <Link href="/dashboard" class="transition hover:text-blue-700">Admin portal</Link>
-                    <Link href="/privacy" class="transition hover:text-blue-700">Privacy</Link>
-                    <Link href="/terms" class="transition hover:text-blue-700">Terms</Link>
                     <Link href="/login" class="rounded-full border border-slate-300 px-4 py-2 text-slate-700 transition hover:bg-slate-50">Log in</Link>
                 </div>
             </nav>

@@ -117,8 +117,11 @@ describe('Wizard import step — reaching it', () => {
         await reachImportStep();
 
         expect(wrapper.text()).toContain('Make the estimate sharper with data you already have');
+        expect(wrapper.text()).toContain('Exit assessment');
+        expect(wrapper.text()).toContain('Back to home');
         expect(wrapper.text()).toContain('Privacy Policy');
         expect(wrapper.text()).toContain('Terms');
+        expect(wrapper.find('a[href="/"]').exists()).toBe(true);
         expect(wrapper.find('[data-testid="choose-csv"]').exists()).toBe(true);
         expect(postCallsEndingWith('/submit')).toHaveLength(0);
         expect(postCallsEndingWith('/imports')).toHaveLength(0);

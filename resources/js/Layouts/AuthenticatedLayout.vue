@@ -43,13 +43,7 @@ const showingNavigationDropdown = ref(false);
                                     :href="route('dashboard')"
                                     :active="route().current('dashboard')"
                                 >
-                                    Workspace
-                                </NavLink>
-                                <NavLink href="/privacy" :active="route().current('privacy')">
-                                    Privacy
-                                </NavLink>
-                                <NavLink href="/terms" :active="route().current('terms')">
-                                    Terms
+                                    Admin portal
                                 </NavLink>
                             </div>
                         </div>
@@ -162,13 +156,7 @@ const showingNavigationDropdown = ref(false);
                             :href="route('dashboard')"
                             :active="route().current('dashboard')"
                         >
-                            Workspace
-                        </ResponsiveNavLink>
-                        <ResponsiveNavLink href="/privacy" :active="route().current('privacy')">
-                            Privacy
-                        </ResponsiveNavLink>
-                        <ResponsiveNavLink href="/terms" :active="route().current('terms')">
-                            Terms
+                            Admin portal
                         </ResponsiveNavLink>
                     </div>
 

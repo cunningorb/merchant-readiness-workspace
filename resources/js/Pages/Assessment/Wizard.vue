@@ -517,14 +517,19 @@ function importStatusLabel(status) {
 <template>
     <main class="min-h-screen bg-slate-50 px-6 py-10 text-slate-900 sm:px-8">
         <section class="mx-auto max-w-5xl">
-            <div class="mb-10 max-w-3xl">
-                <p class="mb-4 inline-flex rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700">
-                    Merchant Readiness Assessment
-                </p>
-                <h1 class="text-4xl font-bold tracking-tight sm:text-5xl">Evaluate your returns operation.</h1>
-                <p class="mt-5 text-lg leading-8 text-slate-600">
-                    Complete each section, then submit to see your readiness score, breakdown, and recommendations. Your answers save automatically as you go.
-                </p>
+            <div class="mb-10 flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
+                <div class="max-w-3xl">
+                    <p class="mb-4 inline-flex rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700">
+                        Merchant Readiness Assessment
+                    </p>
+                    <h1 class="text-4xl font-bold tracking-tight sm:text-5xl">Evaluate your returns operation.</h1>
+                    <p class="mt-5 text-lg leading-8 text-slate-600">
+                        Complete each section, then submit to see your readiness score, breakdown, and recommendations. Your answers save automatically as you go.
+                    </p>
+                </div>
+                <Link href="/" class="inline-flex shrink-0 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50">
+                    Exit assessment
+                </Link>
             </div>
 
             <template v-if="currentPhase === 'questions'">
@@ -912,5 +917,13 @@ function importStatusLabel(status) {
 
             <AssessmentResults v-if="submitResult" :result="submitResult" :catalog="catalog" :report-url="submitResult.report.url" />
         </section>
+
+        <footer class="mx-auto mt-12 flex max-w-5xl flex-col gap-3 border-t border-slate-200 pt-6 text-sm text-slate-500 sm:flex-row sm:items-center sm:justify-between">
+            <Link href="/" class="font-medium text-slate-600 hover:text-blue-700">Back to home</Link>
+            <div class="flex gap-4">
+                <Link href="/privacy" class="hover:text-blue-700">Privacy</Link>
+                <Link href="/terms" class="hover:text-blue-700">Terms</Link>
+            </div>
+        </footer>
     </main>
 </template>
