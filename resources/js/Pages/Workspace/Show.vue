@@ -1,8 +1,11 @@
 <script setup>
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { Head, Link } from '@inertiajs/vue3';
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
+import AuthenticatedLayout from '../../Layouts/AuthenticatedLayout.vue';
 import AssessmentResults from '../Assessment/AssessmentResults.vue';
+import CalculationModal from '../../Components/Report/CalculationModal.vue';
+import OpportunityHero from '../../Components/Report/OpportunityHero.vue';
+import SupportingMetricStrip from '../../Components/Report/SupportingMetricStrip.vue';
 
 const props = defineProps({
     report: {
@@ -41,6 +44,30 @@ const submittedOn = computed(() => new Date(props.report.submitted_at).toLocaleD
     month: 'long',
     day: 'numeric',
 }));
+
+const explanations = computed(() => props.report.calculationExplanations ?? {});
+
+const heroHasCalculation = computed(() =>
+    props.report.heroOpportunity.type != null && explanations.value[props.report.heroOpportunity.type] != null);
+
+const enrichedMetrics = computed(() => props.report.supportingMetrics.map((metric) => ({
+    ...metric,
+    confidence: metric.source === 'opportunity' ? explanations.value[metric.key]?.confidence ?? null : null,
+})));
+
+const activeExplanationType = ref(null);
+const activeExplanation = computed(() =>
+    activeExplanationType.value != null ? explanations.value[activeExplanationType.value] ?? null : null);
+
+function openCalculation(type) {
+    if (type != null && explanations.value[type] != null) {
+        activeExplanationType.value = type;
+    }
+}
+
+function closeCalculation() {
+    activeExplanationType.value = null;
+}
 </script>
 
 <template>
@@ -59,22 +86,39 @@ const submittedOn = computed(() => new Date(props.report.submitted_at).toLocaleD
                     <p class="mt-1 text-sm text-slate-500">Submitted {{ submittedOn }}</p>
                 </div>
 
-                <AssessmentResults :result="result" :catalog="catalog" />
+                <div class="space-y-8">
+                    <OpportunityHero
+                        :opportunity="report.heroOpportunity"
+                        :has-calculation="heroHasCalculation"
+                        @see-calculation="openCalculation(report.heroOpportunity.type)"
+                    />
 
-                <div class="mt-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                    <h3 class="text-lg font-semibold text-slate-900">Talking Points</h3>
-                    <ol class="mt-4 space-y-4">
-                        <li v-for="(point, index) in report.talking_points" :key="index" class="flex gap-3">
-                            <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-semibold text-blue-700">{{ index + 1 }}</span>
-                            <div>
-                                <p class="font-medium text-slate-900">{{ point.title }}</p>
-                                <p class="mt-1 text-sm text-slate-600">{{ point.description }}</p>
-                                <p class="mt-1 text-sm text-slate-500">Expected impact: {{ point.expected_impact }}</p>
-                            </div>
-                        </li>
-                    </ol>
-                    <p v-if="report.talking_points.length === 0" class="mt-4 text-sm text-slate-500">No recommendations to highlight.</p>
+                    <SupportingMetricStrip :metrics="enrichedMetrics" />
+
+                    <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                        <h3 class="text-lg font-semibold text-slate-900">Talking Points</h3>
+                        <ol class="mt-4 space-y-4">
+                            <li v-for="(point, index) in report.talking_points" :key="index" class="flex gap-3">
+                                <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-semibold text-blue-700">{{ index + 1 }}</span>
+                                <div>
+                                    <p class="font-medium text-slate-900">{{ point.title }}</p>
+                                    <p class="mt-1 text-sm text-slate-600">{{ point.description }}</p>
+                                    <p class="mt-1 text-sm text-slate-500">Expected impact: {{ point.expected_impact }}</p>
+                                </div>
+                            </li>
+                        </ol>
+                        <p v-if="report.talking_points.length === 0" class="mt-4 text-sm text-slate-500">No recommendations to highlight.</p>
+                    </div>
+
+                    <section aria-labelledby="diagnostic-heading">
+                        <h2 id="diagnostic-heading" class="text-sm font-semibold uppercase tracking-wide text-slate-400">
+                            Full diagnostic breakdown
+                        </h2>
+                        <AssessmentResults :result="result" :catalog="catalog" />
+                    </section>
                 </div>
+
+                <CalculationModal :open="activeExplanation !== null" :explanation="activeExplanation" @close="closeCalculation" />
             </div>
         </div>
     </AuthenticatedLayout>

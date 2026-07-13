@@ -40,8 +40,8 @@ describe('OpportunityHero', () => {
         });
 
         expect(wrapper.text()).toContain('$32,000–$51,000');
-        expect(wrapper.text()).toContain('may');
-        expect(wrapper.text()).toContain('annually');
+        expect(wrapper.text()).toContain('could get back');
+        expect(wrapper.text()).toContain('this year');
         expect(wrapper.text()).not.toContain('.00');
         expect(wrapper.text()).toContain(monetaryOpportunity.summary);
     });

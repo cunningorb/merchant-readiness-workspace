@@ -51,9 +51,9 @@ const quantifiedRange = computed(() => {
         <p class="text-xs font-semibold uppercase tracking-wide text-blue-600">Your estimated opportunity</p>
 
         <h2 v-if="kind === 'monetary'" id="opportunity-hero-heading" class="mt-3 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
-            You may be able to retain
+            Your company could get back
             <span class="text-blue-700">{{ monetaryRange }}</span>
-            more revenue annually
+            in revenue this year
         </h2>
 
         <template v-else-if="kind === 'quantified'">

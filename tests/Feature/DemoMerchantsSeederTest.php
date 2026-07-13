@@ -2,7 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Models\AssessmentOpportunity;
 use App\Models\Merchant;
+use App\Services\ReportBuilderService;
 use Database\Seeders\DemoMerchantsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -24,6 +26,16 @@ class DemoMerchantsSeederTest extends TestCase
         $this->assertSame(0, $thistleAssessment->overall_score);
         $this->assertSame('Foundational', $thistleAssessment->overall_tier);
         $this->assertNotNull($thistleAssessment->report);
+
+        $thistleAssessment->load('opportunities');
+        $retainedRevenue = $thistleAssessment->opportunities->firstWhere('type', AssessmentOpportunity::TYPE_RETAINED_REVENUE);
+        $this->assertNotNull($retainedRevenue);
+        $this->assertGreaterThan(0, (float) $retainedRevenue->minimum_value);
+        $this->assertGreaterThan((float) $retainedRevenue->minimum_value, (float) $retainedRevenue->maximum_value);
+
+        $payload = app(ReportBuilderService::class)->buildPayload($thistleAssessment->report);
+        $this->assertSame('monetary', $payload['heroOpportunity']['kind']);
+        $this->assertSame(AssessmentOpportunity::TYPE_RETAINED_REVENUE, $payload['heroOpportunity']['type']);
 
         $northline = Merchant::where('company_name', 'Northline Outdoor Supply')->firstOrFail();
         $northlineAssessment = $northline->assessments->first();

@@ -1,0 +1,123 @@
+import { describe, it, expect, afterEach, vi } from 'vitest';
+import { mount } from '@vue/test-utils';
+import Show from '../Show.vue';
+
+vi.mock('@inertiajs/vue3', () => ({
+    Head: { template: '<span />' },
+    Link: {
+        props: ['href'],
+        template: '<a :href="href"><slot /></a>',
+    },
+}));
+
+vi.mock('../../../Layouts/AuthenticatedLayout.vue', () => ({
+    default: {
+        template: '<div><slot name="header" /><slot /></div>',
+    },
+}));
+
+const report = {
+    merchant: {
+        company_name: 'Thistle & Bloom Apparel',
+        contact_name: 'Priya Anand',
+        contact_email: 'hello@thistleandbloom.example',
+        website: 'thistleandbloom.example',
+    },
+    assessment: {
+        overall_score: 0,
+        overall_tier: 'Foundational',
+        section_scores: {
+            return_policy: { score: 0, tier: 'Foundational' },
+            exchanges: { score: 0, tier: 'Foundational' },
+        },
+        ranked_sections: {
+            return_policy: { score: 0, tier: 'Foundational' },
+            exchanges: { score: 0, tier: 'Foundational' },
+        },
+    },
+    recommendations: [],
+    submitted_at: '2026-07-12T00:00:00.000000Z',
+    heroOpportunity: {
+        kind: 'monetary',
+        type: 'retained_revenue',
+        title: 'Retained revenue from exchange conversion',
+        summary: 'Estimated revenue that may be retained per year by converting more eligible returns into exchanges instead of refunds.',
+        minimum_value: 105000,
+        maximum_value: 210000,
+        unit: 'usd_per_year',
+        confidence: 'medium',
+        effort: 'medium',
+        assumptions: {},
+        evidence: { inputs: {} },
+        formula_version: '1.0',
+    },
+    supportingMetrics: [
+        { key: 'retained_revenue', label: 'Retained revenue potential', value: '$105,000-$210,000 per year', unit: 'usd_per_year', source: 'opportunity' },
+        { key: 'manual_work_savings', label: 'Manual work savings', value: '20-35 hours per week', unit: 'hours_per_week', source: 'opportunity' },
+        { key: 'overall_score', label: 'Readiness score', value: 0, unit: null, source: 'score' },
+    ],
+    calculationExplanations: {
+        retained_revenue: {
+            title: 'Retained revenue potential',
+            formula_description: 'Annual order volume x estimated return rate x average order value.',
+            inputs: { order_volume_band: '1,000-10,000' },
+            assumptions: {},
+            confidence: 'medium',
+            formula_version: '1.0',
+        },
+    },
+    talking_points: [
+        {
+            title: 'Offer exchanges, not just refunds',
+            description: 'Exchange conversion can retain revenue that would otherwise be lost to refunds.',
+            expected_impact: 'Retain revenue currently lost to refund-only returns.',
+        },
+    ],
+};
+
+const catalog = [
+    { key: 'return_policy', label: 'Return Policy' },
+    { key: 'exchanges', label: 'Exchanges' },
+];
+
+let wrapper;
+
+function mountShow() {
+    wrapper = mount(Show, {
+        props: { report, catalog },
+        global: {
+            mocks: {
+                route: () => '/dashboard',
+            },
+        },
+        attachTo: document.body,
+    });
+
+    return wrapper;
+}
+
+afterEach(() => {
+    wrapper?.unmount();
+    document.body.style.overflow = '';
+});
+
+describe('Workspace/Show', () => {
+    it('leads with the quantified revenue opportunity before the diagnostic breakdown', () => {
+        const wrapper = mountShow();
+        const html = wrapper.html();
+
+        const heroIndex = html.indexOf('data-testid="opportunity-hero"');
+        const diagnosticIndex = html.indexOf('Full diagnostic breakdown');
+
+        expect(heroIndex).toBeGreaterThan(-1);
+        expect(diagnosticIndex).toBeGreaterThan(heroIndex);
+        expect(wrapper.text()).toContain('Your company could get back $105,000–$210,000 in revenue this year');
+    });
+
+    it('keeps talking points visible for internal follow-up', () => {
+        const wrapper = mountShow();
+
+        expect(wrapper.text()).toContain('Talking Points');
+        expect(wrapper.text()).toContain('Offer exchanges, not just refunds');
+    });
+});
