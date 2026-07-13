@@ -52,7 +52,8 @@ Core Services
 
 Contracts
 
-- MerchantDataSource
+- MerchantDataProvider (plus CatalogImporter, OrderReturnImporter, InventoryImporter,
+  ImportNormalizer, ImportMetricCalculator — see `docs/data-ingestion.md`)
 - AssessmentScorer
 - RecommendationRule
 
@@ -66,10 +67,12 @@ POST /api/assessments/{id}/submit
 
 GET /api/reports/{token}
 
+Implemented (Milestone 11): a provider-agnostic import framework with a synthetic demo
+provider and a custom CSV upload provider — see `docs/data-ingestion.md`.
+
 Future
 
-- CSV import
-- Shopify Dev Store importer
+- Real Shopify export/API importer
 - WooCommerce importer
 
 ## TDD Strategy
