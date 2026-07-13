@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\ImportMethod;
 use App\Enums\ImportStatus;
 use App\Http\Requests\StartImportRequest;
 use App\Http\Requests\StoreDataImportFileRequest;
@@ -32,7 +33,13 @@ class ImportController extends Controller
             return $this->respondWithImport($dataImport);
         }
 
-        $dataImport = $coordinator->create($assessment, provider: $data['provider'], method: $data['method']);
+        // 'method' is never accepted from the client: the only provider that
+        // reaches this branch is 'csv' (the 'demo' provider returns above),
+        // and csv imports are always performed via the 'csv' method. Trusting
+        // a client-supplied method would let a caller vary the idempotency
+        // fingerprint (which folds provider+method in) without changing the
+        // underlying file content, defeating duplicate detection.
+        $dataImport = $coordinator->create($assessment, provider: $data['provider'], method: ImportMethod::Csv->value);
 
         return $this->respondWithImport($dataImport, 201);
     }

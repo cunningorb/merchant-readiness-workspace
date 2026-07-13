@@ -17,7 +17,6 @@ class StartImportRequest extends FormRequest
     {
         return [
             'provider' => ['required', 'string', Rule::in(['csv', 'demo'])],
-            'method' => ['required', 'string', Rule::in(['csv', 'demo'])],
             'scenario' => [
                 Rule::requiredIf(fn () => $this->input('provider') === 'demo'),
                 'nullable',

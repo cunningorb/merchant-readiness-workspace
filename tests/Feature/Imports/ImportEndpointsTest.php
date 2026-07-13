@@ -69,7 +69,6 @@ class ImportEndpointsTest extends TestCase
 
         $create = $this->postJson("/api/assessments/{$assessment->id}/imports", [
             'provider' => 'csv',
-            'method' => 'csv',
         ]);
 
         $create->assertCreated();
@@ -117,7 +116,6 @@ class ImportEndpointsTest extends TestCase
         $assessment = $this->assessment();
         $importId = $this->postJson("/api/assessments/{$assessment->id}/imports", [
             'provider' => 'csv',
-            'method' => 'csv',
         ])->json('data_import.id');
 
         $response = $this->postJson("/api/assessments/{$assessment->id}/imports/{$importId}/files", [
@@ -135,7 +133,6 @@ class ImportEndpointsTest extends TestCase
         $assessment = $this->assessment();
         $importId = $this->postJson("/api/assessments/{$assessment->id}/imports", [
             'provider' => 'csv',
-            'method' => 'csv',
         ])->json('data_import.id');
 
         $this->postJson("/api/assessments/{$assessment->id}/imports/{$importId}/files", [
@@ -160,7 +157,6 @@ class ImportEndpointsTest extends TestCase
         $assessment = $this->assessment();
         $importId = $this->postJson("/api/assessments/{$assessment->id}/imports", [
             'provider' => 'csv',
-            'method' => 'csv',
         ])->json('data_import.id');
 
         $response = $this->postJson("/api/assessments/{$assessment->id}/imports/{$importId}/cancel");
@@ -177,7 +173,6 @@ class ImportEndpointsTest extends TestCase
         $assessment = $this->assessment();
         $importId = $this->postJson("/api/assessments/{$assessment->id}/imports", [
             'provider' => 'csv',
-            'method' => 'csv',
         ])->json('data_import.id');
 
         $this->postJson("/api/assessments/{$assessment->id}/imports/{$importId}/files", [
@@ -213,7 +208,6 @@ class ImportEndpointsTest extends TestCase
         $firstAssessment = $this->assessment($merchant);
         $firstImportId = $this->postJson("/api/assessments/{$firstAssessment->id}/imports", [
             'provider' => 'csv',
-            'method' => 'csv',
         ])->json('data_import.id');
 
         $this->postJson("/api/assessments/{$firstAssessment->id}/imports/{$firstImportId}/files", [
@@ -228,7 +222,6 @@ class ImportEndpointsTest extends TestCase
         $secondAssessment = $this->assessment($merchant);
         $secondImportId = $this->postJson("/api/assessments/{$secondAssessment->id}/imports", [
             'provider' => 'csv',
-            'method' => 'csv',
         ])->json('data_import.id');
 
         $this->postJson("/api/assessments/{$secondAssessment->id}/imports/{$secondImportId}/files", [
@@ -243,6 +236,51 @@ class ImportEndpointsTest extends TestCase
         // Idempotency short-circuit: no second pass of the importer ran, so
         // no duplicate MerchantProduct rows exist for this merchant.
         $this->assertSame(1, MerchantProduct::query()->count());
+    }
+
+    public function test_a_client_supplied_method_value_cannot_be_used_to_defeat_duplicate_detection(): void
+    {
+        Storage::fake('local');
+        $merchant = Merchant::factory()->create();
+        $csv = $this->validProductsCsv();
+
+        $firstAssessment = $this->assessment($merchant);
+        $firstImportId = $this->postJson("/api/assessments/{$firstAssessment->id}/imports", [
+            'provider' => 'csv',
+            'method' => 'csv',
+        ])->json('data_import.id');
+
+        $this->postJson("/api/assessments/{$firstAssessment->id}/imports/{$firstImportId}/files", [
+            'data_type' => 'catalog',
+            'file' => UploadedFile::fake()->createWithContent('products.csv', $csv),
+        ])->assertOk();
+
+        $this->postJson("/api/assessments/{$firstAssessment->id}/imports/{$firstImportId}/process")->assertOk();
+
+        $this->assertSame(1, MerchantProduct::query()->count());
+
+        // Same byte-identical file content again, but this time the request
+        // body supplies a different 'method' value. Since the server now
+        // derives 'method' from 'provider' rather than trusting client
+        // input, this must not change the resulting fingerprint, and the
+        // re-import must still be recognized as a duplicate.
+        $secondAssessment = $this->assessment($merchant);
+        $secondImportId = $this->postJson("/api/assessments/{$secondAssessment->id}/imports", [
+            'provider' => 'csv',
+            'method' => 'demo',
+        ])->json('data_import.id');
+
+        $this->postJson("/api/assessments/{$secondAssessment->id}/imports/{$secondImportId}/files", [
+            'data_type' => 'catalog',
+            'file' => UploadedFile::fake()->createWithContent('products.csv', $csv),
+        ])->assertOk();
+
+        $secondProcess = $this->postJson("/api/assessments/{$secondAssessment->id}/imports/{$secondImportId}/process");
+        $secondProcess->assertOk();
+        $secondProcess->assertJsonPath('data_import.status', ImportStatus::Completed->value);
+
+        $this->assertSame(1, MerchantProduct::query()->count());
+        $this->assertSame('csv', $secondProcess->json('data_import.method'));
     }
 
     // --- No customer PII -----------------------------------------------------
