@@ -71,9 +71,11 @@ column formats (`products.csv`, `orders_and_returns.csv`, `inventory_and_locatio
 project's own design, documented in `docs/data-ingestion.md`, chosen for the fewest columns
 needed to prove the framework end-to-end. They are not Shopify's real export schema, and
 `CsvMerchantDataProvider`'s docblock states this explicitly. `csv` and the not-yet-implemented
-`shopify` are kept as distinct provider keys (`ImportMethod::Csv` / `ImportMethod::Api` already
-exist as separate enum cases) rather than treating CSV as a stand-in for Shopify, because a real
-Shopify provider will need alias detection and Shopify's actual column/field mapping — different
+`shopify` are kept as distinct provider keys (`data_imports.provider` is a free-form string, not
+enum-backed like `data_imports.method`/`ImportMethod`; distinctness is maintained by contract and
+convention — each `MerchantDataProvider::provider(): string` implementation returns its own key,
+and `ImportProviderRegistry` is keyed on that string) rather than treating CSV as a stand-in for
+Shopify, because a real Shopify provider will need alias detection and Shopify's actual column/field mapping — different
 implementation entirely, just satisfying the same contracts. Keeping the keys distinct means a
 future Shopify provider is additive (a new registry registration) rather than a breaking change
 to how CSV imports are identified, fingerprinted, or reported on.
