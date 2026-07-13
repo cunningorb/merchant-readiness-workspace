@@ -1,9 +1,28 @@
 <script setup>
 import axios from 'axios';
-import { computed, onMounted, ref, watch, watchEffect } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch, watchEffect } from 'vue';
 import AssessmentResults from './AssessmentResults.vue';
 
 const AUTOSAVE_DEBOUNCE_MS = 600;
+const IMPORT_POLL_MS = 1500;
+
+// Statuses at which an import has stopped moving on its own; polling ends here.
+const TERMINAL_IMPORT_STATUSES = ['completed', 'completed_with_warnings', 'failed', 'cancelled'];
+
+// The three CSV upload cards. Keys are the exact data_type values the backend
+// validates against (ImportCoordinator::DATA_TYPE_*).
+const CSV_DATA_TYPES = [
+    { key: 'catalog', label: 'Products', hint: 'Product and variant export' },
+    { key: 'orders_returns', label: 'Orders & returns', hint: 'Orders and refunds export' },
+    { key: 'inventory_locations', label: 'Inventory & locations', hint: 'Stock levels by location export' },
+];
+
+// Demo scenarios use Task 4's exact scenario keys (DemoScenarios::SCENARIOS).
+const DEMO_SCENARIOS = [
+    { key: 'apparel', label: 'Apparel growth brand' },
+    { key: 'footwear', label: 'Footwear multi-location brand' },
+    { key: 'home_goods', label: 'Home-goods small merchant' },
+];
 
 const props = defineProps({
     catalog: {
@@ -22,6 +41,26 @@ const submitError = ref(null);
 const isSubmitting = ref(false);
 const isMounted = ref(false);
 
+// Explicit three-phase model. 'results' is reached only as a side effect of a
+// successful submitAssessment() (see the submitResult watcher below), so this
+// task never sets it directly.
+const currentPhase = ref('questions');
+
+// Import-step state. All of this is intentionally isolated from the draft state
+// above (answers / assessmentId / currentSectionIndex): nothing here ever
+// mutates those, so an import failure can never corrupt saved progress.
+const importMode = ref(null); // null | 'csv' | 'demo'
+const csvFiles = ref(freshCsvFiles());
+const csvImportId = ref(null);
+const csvImportStatus = ref(null); // null until process() is triggered
+const csvWarningsCount = ref(0);
+const csvErrorsCount = ref(0);
+const csvActionError = ref(null);
+const demoScenario = ref(null);
+const demoState = ref('idle'); // idle | loading | done | error
+const demoError = ref(null);
+let pollTimer = null;
+
 let debounceTimer = null;
 let savePromise = null;
 let pendingSectionIndex = null;
@@ -29,6 +68,16 @@ let startPromise = null;
 
 const currentSection = computed(() => props.catalog[currentSectionIndex.value]);
 const isLastSection = computed(() => currentSectionIndex.value === props.catalog.length - 1);
+
+const hasAttachedCsvFile = computed(() =>
+    Object.values(csvFiles.value).some((entry) => entry.state === 'attached'),
+);
+const isCsvProcessing = computed(() =>
+    csvImportStatus.value !== null && !TERMINAL_IMPORT_STATUSES.includes(csvImportStatus.value),
+);
+const isCsvTerminal = computed(() =>
+    csvImportStatus.value !== null && TERMINAL_IMPORT_STATUSES.includes(csvImportStatus.value),
+);
 
 watchEffect(() => {
     props.catalog.forEach((section) => {
@@ -42,6 +91,22 @@ watchEffect(() => {
 
 onMounted(() => {
     isMounted.value = true;
+});
+
+// The interval poll is the same class of resource the autosave debounce timer
+// once leaked; clear it on unmount so no request fires after the component dies.
+onUnmounted(() => {
+    stopPolling();
+});
+
+// Results are shown whenever submitResult is set. Keep the explicit phase in
+// sync (and stop any in-flight poll) rather than driving 'results' by hand from
+// each submit call site.
+watch(submitResult, (value) => {
+    if (value) {
+        stopPolling();
+        currentPhase.value = 'results';
+    }
 });
 
 watch(answers, () => {
@@ -209,6 +274,204 @@ async function submitAssessment() {
         isSubmitting.value = false;
     }
 }
+
+// --- Import step ("Improve accuracy with store data") ------------------------
+//
+// This entire section is additive and side-effect-isolated from the draft:
+// it reads assessmentId / startAssessment() but never writes answers,
+// currentSectionIndex, or the autosave timers.
+
+function freshCsvFiles() {
+    return {
+        catalog: { state: 'idle', filename: null, error: null },
+        orders_returns: { state: 'idle', filename: null, error: null },
+        inventory_locations: { state: 'idle', filename: null, error: null },
+    };
+}
+
+// Last section's primary action: bank any pending answer edits, then advance to
+// the import step. It deliberately does NOT submit — submission now happens from
+// within the import step.
+function goToImportStep() {
+    flushSaveImmediately();
+    currentPhase.value = 'import';
+}
+
+// "Back to questions": answers are already in answers.value and autosaved, so
+// this is pure navigation. Stop any poll so it can't outlive the step.
+function goBackToQuestions() {
+    stopPolling();
+    currentPhase.value = 'questions';
+}
+
+function selectImportMode(mode) {
+    importMode.value = mode;
+}
+
+async function ensureCsvImport() {
+    if (csvImportId.value) {
+        return;
+    }
+
+    await startAssessment();
+
+    // 'method' is server-derived for csv imports; we only send the provider.
+    const response = await axios.post(`/api/assessments/${assessmentId.value}/imports`, {
+        provider: 'csv',
+    });
+
+    csvImportId.value = response.data.data_import.id;
+}
+
+async function onCsvFileSelected(dataType, event) {
+    const file = event.target?.files?.[0];
+
+    if (!file) {
+        return;
+    }
+
+    const entry = csvFiles.value[dataType];
+    entry.filename = file.name;
+    entry.error = null;
+    entry.state = 'uploading';
+
+    try {
+        await ensureCsvImport();
+
+        const form = new FormData();
+        form.append('data_type', dataType);
+        form.append('file', file);
+
+        await axios.post(
+            `/api/assessments/${assessmentId.value}/imports/${csvImportId.value}/files`,
+            form,
+        );
+
+        entry.state = 'attached';
+    } catch (error) {
+        entry.state = 'error';
+        entry.error = uploadErrorMessage(error);
+    }
+}
+
+function uploadErrorMessage(error) {
+    const data = error.response?.data;
+    const firstError = data?.errors ? Object.values(data.errors)[0] : null;
+
+    if (Array.isArray(firstError) && firstError.length) {
+        return firstError[0];
+    }
+
+    return data?.message ?? 'That file could not be uploaded. Please try a different CSV.';
+}
+
+function applyImportSnapshot(dataImport) {
+    csvImportStatus.value = dataImport.status;
+    csvWarningsCount.value = dataImport.warnings_count ?? 0;
+    csvErrorsCount.value = dataImport.errors_count ?? 0;
+}
+
+async function processCsvImport() {
+    csvActionError.value = null;
+
+    try {
+        const response = await axios.post(
+            `/api/assessments/${assessmentId.value}/imports/${csvImportId.value}/process`,
+        );
+
+        applyImportSnapshot(response.data.data_import);
+
+        // If the queue ran synchronously the import is already terminal; only
+        // poll when it is still in flight.
+        if (!TERMINAL_IMPORT_STATUSES.includes(csvImportStatus.value)) {
+            startPolling();
+        }
+    } catch (error) {
+        csvActionError.value = 'We could not start the import. Please try again.';
+    }
+}
+
+function startPolling() {
+    stopPolling();
+    pollTimer = setInterval(pollImport, IMPORT_POLL_MS);
+}
+
+function stopPolling() {
+    if (pollTimer !== null) {
+        clearInterval(pollTimer);
+        pollTimer = null;
+    }
+}
+
+async function pollImport() {
+    try {
+        const response = await axios.get(
+            `/api/assessments/${assessmentId.value}/imports/${csvImportId.value}`,
+        );
+
+        applyImportSnapshot(response.data.data_import);
+
+        if (TERMINAL_IMPORT_STATUSES.includes(csvImportStatus.value)) {
+            stopPolling();
+        }
+    } catch (error) {
+        // Transient poll failure: leave the interval running for the next tick.
+    }
+}
+
+async function cancelCsvImport() {
+    stopPolling();
+
+    try {
+        await axios.post(`/api/assessments/${assessmentId.value}/imports/${csvImportId.value}/cancel`);
+    } catch (error) {
+        // Cancel is best-effort; reset the UI regardless of the response.
+    }
+
+    // A cancelled import is terminal on the backend (it cannot be re-processed
+    // or have more files attached), so returning to the pre-process state means
+    // starting a fresh import — the same recovery path as "Try again".
+    resetCsvImport();
+}
+
+function resetCsvImport() {
+    stopPolling();
+    csvFiles.value = freshCsvFiles();
+    csvImportId.value = null;
+    csvImportStatus.value = null;
+    csvWarningsCount.value = 0;
+    csvErrorsCount.value = 0;
+    csvActionError.value = null;
+}
+
+async function useDemoScenario(scenario) {
+    demoScenario.value = scenario;
+    demoError.value = null;
+    demoState.value = 'loading';
+
+    try {
+        await startAssessment();
+
+        await axios.post(`/api/assessments/${assessmentId.value}/imports`, {
+            provider: 'demo',
+            scenario,
+        });
+
+        demoState.value = 'done';
+    } catch (error) {
+        demoState.value = 'error';
+        demoError.value = 'We could not load that demo dataset. Please try again.';
+    }
+}
+
+function importStatusLabel(status) {
+    return {
+        validating: 'Queued…',
+        queued: 'Queued…',
+        importing: 'Importing…',
+        processing: 'Processing…',
+    }[status] ?? 'Working…';
+}
 </script>
 
 <template>
@@ -224,7 +487,7 @@ async function submitAssessment() {
                 </p>
             </div>
 
-            <template v-if="!submitResult">
+            <template v-if="currentPhase === 'questions'">
                 <div class="mb-8 grid gap-3 sm:grid-cols-6">
                     <button
                         v-for="(section, index) in catalog"
@@ -319,16 +582,278 @@ async function submitAssessment() {
                 <div v-if="isLastSection" class="mt-6 flex justify-end">
                     <button
                         type="button"
-                        class="rounded-xl border border-blue-300 bg-blue-50 px-5 py-3 text-sm font-semibold text-blue-700 transition hover:bg-blue-100 disabled:opacity-60"
-                        :disabled="isSubmitting"
-                        :aria-busy="isSubmitting"
-                        @click="submitAssessment"
+                        data-testid="continue-to-import"
+                        class="rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-200 transition hover:bg-blue-700"
+                        @click="goToImportStep"
                     >
-                        {{ isSubmitting ? 'Submitting…' : 'Submit assessment' }}
+                        Continue
                     </button>
                 </div>
 
                 <p v-if="submitError" class="mt-3 text-right text-sm text-red-600" role="alert">{{ submitError }}</p>
+            </template>
+
+            <template v-else-if="currentPhase === 'import'">
+                <div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+                    <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                        <div class="max-w-2xl">
+                            <h2 class="text-2xl font-semibold tracking-tight">Get a more useful estimate from data you already have</h2>
+                            <p class="mt-3 text-slate-600">
+                                Connect read-only Shopify data or upload exports. We use aggregate catalog, order, return, and inventory signals. Customer identity data is not required.
+                            </p>
+                        </div>
+                        <button
+                            type="button"
+                            data-testid="skip-import"
+                            class="shrink-0 rounded-xl border border-slate-300 px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-60"
+                            :disabled="isSubmitting"
+                            :aria-busy="isSubmitting"
+                            @click="submitAssessment"
+                        >
+                            {{ isSubmitting ? 'Submitting…' : 'Skip for now' }}
+                        </button>
+                    </div>
+
+                    <div class="mt-8 grid gap-4 sm:grid-cols-2">
+                        <!-- Connect Shopify — genuinely disabled, creates nothing -->
+                        <div class="rounded-2xl border border-slate-200 bg-slate-50 p-5 opacity-70">
+                            <div class="flex items-center justify-between gap-2">
+                                <h3 class="text-base font-semibold text-slate-700">Connect Shopify</h3>
+                                <span class="rounded-full bg-slate-200 px-3 py-1 text-xs font-medium text-slate-600">Coming soon</span>
+                            </div>
+                            <p class="mt-2 text-sm text-slate-500">Best estimate · Read-only data · Products, returns, and inventory · Approximately 2–5 minutes</p>
+                            <button
+                                type="button"
+                                data-testid="connect-shopify"
+                                disabled
+                                aria-disabled="true"
+                                class="mt-4 w-full cursor-not-allowed rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-400"
+                            >
+                                Connect Shopify
+                            </button>
+                        </div>
+
+                        <!-- Upload Shopify exports -->
+                        <div
+                            class="rounded-2xl border p-5 transition"
+                            :class="importMode === 'csv' ? 'border-blue-400 bg-blue-50' : 'border-slate-200 bg-white'"
+                        >
+                            <h3 class="text-base font-semibold text-slate-900">Upload Shopify exports</h3>
+                            <p class="mt-2 text-sm text-slate-600">Good estimate · CSV exports · Products, orders &amp; returns, inventory · A few minutes</p>
+                            <button
+                                type="button"
+                                data-testid="choose-csv"
+                                class="mt-4 w-full rounded-xl border border-blue-300 bg-white px-4 py-2.5 text-sm font-semibold text-blue-700 transition hover:bg-blue-50"
+                                @click="selectImportMode('csv')"
+                            >
+                                Upload exports
+                            </button>
+                        </div>
+
+                        <!-- Use demo data -->
+                        <div
+                            class="rounded-2xl border p-5 transition"
+                            :class="importMode === 'demo' ? 'border-blue-400 bg-blue-50' : 'border-slate-200 bg-white'"
+                        >
+                            <h3 class="text-base font-semibold text-slate-900">Use demo data</h3>
+                            <p class="mt-2 text-sm text-slate-600">Explore instantly · Synthetic sample store · Not your real data · Loads in seconds</p>
+                            <button
+                                type="button"
+                                data-testid="choose-demo"
+                                class="mt-4 w-full rounded-xl border border-blue-300 bg-white px-4 py-2.5 text-sm font-semibold text-blue-700 transition hover:bg-blue-50"
+                                @click="selectImportMode('demo')"
+                            >
+                                Try a sample store
+                            </button>
+                        </div>
+
+                        <!-- Continue manually -->
+                        <div class="rounded-2xl border border-slate-200 bg-white p-5">
+                            <h3 class="text-base font-semibold text-slate-900">Continue manually</h3>
+                            <p class="mt-2 text-sm text-slate-600">Skip the data step and score using only your answers. You can always come back before submitting.</p>
+                            <button
+                                type="button"
+                                data-testid="continue-manually"
+                                class="mt-4 w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-60"
+                                :disabled="isSubmitting"
+                                :aria-busy="isSubmitting"
+                                @click="submitAssessment"
+                            >
+                                {{ isSubmitting ? 'Submitting…' : 'Continue without data' }}
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- CSV upload panel -->
+                    <div v-if="importMode === 'csv'" data-testid="csv-panel" class="mt-8 rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                        <h4 class="text-sm font-semibold text-slate-900">Upload CSV exports</h4>
+                        <p class="mt-1 text-sm text-slate-600">Add any of the three exports below. Each accepts a single .csv file.</p>
+
+                        <div class="mt-4 grid gap-3 sm:grid-cols-3">
+                            <div
+                                v-for="dataType in CSV_DATA_TYPES"
+                                :key="dataType.key"
+                                class="rounded-xl border border-slate-200 bg-white p-4"
+                            >
+                                <p class="text-sm font-semibold text-slate-900">{{ dataType.label }}</p>
+                                <p class="mt-1 text-xs text-slate-500">{{ dataType.hint }}</p>
+
+                                <label class="mt-3 inline-flex cursor-pointer items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50">
+                                    Choose file
+                                    <input
+                                        type="file"
+                                        accept=".csv"
+                                        class="sr-only"
+                                        :data-testid="`csv-input-${dataType.key}`"
+                                        :disabled="isCsvProcessing"
+                                        @change="onCsvFileSelected(dataType.key, $event)"
+                                    >
+                                </label>
+
+                                <p
+                                    v-if="csvFiles[dataType.key].state !== 'idle'"
+                                    class="mt-2 text-xs"
+                                    :class="csvFiles[dataType.key].state === 'error' ? 'text-red-600' : 'text-slate-600'"
+                                    :data-testid="`csv-state-${dataType.key}`"
+                                >
+                                    <template v-if="csvFiles[dataType.key].state === 'uploading'">Uploading {{ csvFiles[dataType.key].filename }}…</template>
+                                    <template v-else-if="csvFiles[dataType.key].state === 'attached'">Attached: {{ csvFiles[dataType.key].filename }}</template>
+                                    <template v-else-if="csvFiles[dataType.key].state === 'error'">{{ csvFiles[dataType.key].error }}</template>
+                                </p>
+                            </div>
+                        </div>
+
+                        <p v-if="csvActionError" class="mt-4 text-sm text-red-600" role="alert">{{ csvActionError }}</p>
+
+                        <!-- Pre-process actions -->
+                        <div v-if="!isCsvProcessing && !isCsvTerminal" class="mt-5 flex flex-wrap items-center gap-3">
+                            <button
+                                type="button"
+                                data-testid="process-import"
+                                class="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-200 transition hover:bg-blue-700 disabled:opacity-40"
+                                :disabled="!hasAttachedCsvFile"
+                                @click="processCsvImport"
+                            >
+                                Process import
+                            </button>
+                        </div>
+
+                        <!-- In-flight -->
+                        <div v-else-if="isCsvProcessing" class="mt-5 flex flex-wrap items-center gap-3" data-testid="csv-progress">
+                            <span class="text-sm font-medium text-slate-700">{{ importStatusLabel(csvImportStatus) }}</span>
+                            <button
+                                type="button"
+                                data-testid="cancel-import"
+                                class="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-white"
+                                @click="cancelCsvImport"
+                            >
+                                Cancel
+                            </button>
+                        </div>
+
+                        <!-- Terminal outcomes -->
+                        <div v-else-if="isCsvTerminal" class="mt-5" data-testid="csv-result">
+                            <div v-if="csvImportStatus === 'completed'" class="rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-800">
+                                Your store data was imported. Your estimate will use these signals.
+                            </div>
+                            <div v-else-if="csvImportStatus === 'completed_with_warnings'" class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+                                Import finished with {{ csvWarningsCount }} warning(s). Some rows or files couldn't be used, but the rest were imported.
+                            </div>
+                            <div v-else-if="csvImportStatus === 'failed'" class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+                                Import failed ({{ csvErrorsCount }} error(s)). None of the uploaded data could be used. You can try again or continue without it.
+                            </div>
+
+                            <div class="mt-4 flex flex-wrap items-center gap-3">
+                                <button
+                                    v-if="csvImportStatus === 'completed' || csvImportStatus === 'completed_with_warnings'"
+                                    type="button"
+                                    data-testid="csv-continue"
+                                    class="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-200 transition hover:bg-blue-700 disabled:opacity-60"
+                                    :disabled="isSubmitting"
+                                    :aria-busy="isSubmitting"
+                                    @click="submitAssessment"
+                                >
+                                    {{ isSubmitting ? 'Submitting…' : 'Continue' }}
+                                </button>
+
+                                <template v-if="csvImportStatus === 'failed'">
+                                    <button
+                                        type="button"
+                                        data-testid="csv-try-again"
+                                        class="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-white"
+                                        @click="resetCsvImport"
+                                    >
+                                        Try again
+                                    </button>
+                                    <button
+                                        type="button"
+                                        data-testid="csv-continue-without"
+                                        class="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-200 transition hover:bg-blue-700 disabled:opacity-60"
+                                        :disabled="isSubmitting"
+                                        :aria-busy="isSubmitting"
+                                        @click="submitAssessment"
+                                    >
+                                        {{ isSubmitting ? 'Submitting…' : 'Continue without this data' }}
+                                    </button>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Demo panel -->
+                    <div v-if="importMode === 'demo'" data-testid="demo-panel" class="mt-8 rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                        <h4 class="text-sm font-semibold text-slate-900">Load a demo dataset</h4>
+                        <p class="mt-1 text-sm text-slate-600">Synthetic sample data — clearly labeled and never presented as your real store.</p>
+
+                        <div class="mt-4 flex flex-wrap gap-3">
+                            <button
+                                v-for="scenario in DEMO_SCENARIOS"
+                                :key="scenario.key"
+                                type="button"
+                                :data-testid="`demo-${scenario.key}`"
+                                class="rounded-xl border px-4 py-2.5 text-sm font-semibold transition disabled:opacity-60"
+                                :class="demoScenario === scenario.key ? 'border-blue-400 bg-blue-50 text-blue-700' : 'border-slate-300 bg-white text-slate-700 hover:bg-white'"
+                                :disabled="demoState === 'loading'"
+                                @click="useDemoScenario(scenario.key)"
+                            >
+                                {{ scenario.label }}
+                            </button>
+                        </div>
+
+                        <p v-if="demoState === 'loading'" class="mt-4 text-sm text-slate-600" data-testid="demo-loading">Loading demo data…</p>
+
+                        <div v-else-if="demoState === 'done'" class="mt-4" data-testid="demo-done">
+                            <div class="rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-800">
+                                Demo data loaded. Your estimate will use this sample store's signals.
+                            </div>
+                            <button
+                                type="button"
+                                data-testid="demo-continue"
+                                class="mt-4 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-200 transition hover:bg-blue-700 disabled:opacity-60"
+                                :disabled="isSubmitting"
+                                :aria-busy="isSubmitting"
+                                @click="submitAssessment"
+                            >
+                                {{ isSubmitting ? 'Submitting…' : 'Continue' }}
+                            </button>
+                        </div>
+
+                        <p v-else-if="demoState === 'error'" class="mt-4 text-sm text-red-600" role="alert" data-testid="demo-error">{{ demoError }}</p>
+                    </div>
+
+                    <div class="mt-8 flex items-center justify-between border-t border-slate-200 pt-6">
+                        <button
+                            type="button"
+                            data-testid="back-to-questions"
+                            class="text-sm font-semibold text-slate-600 transition hover:text-slate-900"
+                            @click="goBackToQuestions"
+                        >
+                            ← Back to questions
+                        </button>
+                    </div>
+
+                    <p v-if="submitError" class="mt-3 text-right text-sm text-red-600" role="alert">{{ submitError }}</p>
+                </div>
             </template>
 
             <AssessmentResults v-if="submitResult" :result="submitResult" :catalog="catalog" :report-url="submitResult.report.url" />
