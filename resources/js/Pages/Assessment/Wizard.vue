@@ -55,7 +55,9 @@ const csvImportId = ref(null);
 const csvImportStatus = ref(null); // null until process() is triggered
 const csvErrorsCount = ref(0);
 const csvActionError = ref(null);
+let csvImportPromise = null;
 const demoScenario = ref(null);
+const demoImportId = ref(null);
 const demoState = ref('idle'); // idle | loading | done | error
 const demoError = ref(null);
 let pollTimer = null;
@@ -70,6 +72,9 @@ const isLastSection = computed(() => currentSectionIndex.value === props.catalog
 
 const hasAttachedCsvFile = computed(() =>
     Object.values(csvFiles.value).some((entry) => entry.state === 'attached'),
+);
+const isCsvUploading = computed(() =>
+    Object.values(csvFiles.value).some((entry) => entry.state === 'uploading'),
 );
 const isCsvProcessing = computed(() =>
     csvImportStatus.value !== null && !TERMINAL_IMPORT_STATUSES.includes(csvImportStatus.value),
@@ -312,14 +317,21 @@ async function ensureCsvImport() {
         return;
     }
 
-    await startAssessment();
+    if (!csvImportPromise) {
+        csvImportPromise = startAssessment().then(async () => {
+            // 'method' is server-derived for csv imports; we only send the provider.
+            const response = await axios.post(`/api/assessments/${assessmentId.value}/imports`, {
+                provider: 'csv',
+            });
 
-    // 'method' is server-derived for csv imports; we only send the provider.
-    const response = await axios.post(`/api/assessments/${assessmentId.value}/imports`, {
-        provider: 'csv',
-    });
+            csvImportId.value = response.data.data_import.id;
+        }).catch((error) => {
+            csvImportPromise = null;
+            throw error;
+        });
+    }
 
-    csvImportId.value = response.data.data_import.id;
+    await csvImportPromise;
 }
 
 async function onCsvFileSelected(dataType, event) {
@@ -369,6 +381,22 @@ function applyImportSnapshot(dataImport) {
     csvErrorsCount.value = dataImport.errors_count ?? 0;
 }
 
+function applyDemoImportSnapshot(dataImport) {
+    demoImportId.value = dataImport.id;
+
+    if (dataImport.status === 'completed' || dataImport.status === 'completed_with_warnings') {
+        demoState.value = 'done';
+        stopPolling();
+    } else if (dataImport.status === 'failed' || dataImport.status === 'cancelled') {
+        demoState.value = 'error';
+        demoError.value = 'We could not load that demo dataset. Please try again.';
+        stopPolling();
+    } else {
+        demoState.value = 'loading';
+        startPolling();
+    }
+}
+
 async function processCsvImport() {
     csvActionError.value = null;
 
@@ -403,6 +431,16 @@ function stopPolling() {
 
 async function pollImport() {
     try {
+        if (importMode.value === 'demo' && demoImportId.value) {
+            const response = await axios.get(
+                `/api/assessments/${assessmentId.value}/imports/${demoImportId.value}`,
+            );
+
+            applyDemoImportSnapshot(response.data.data_import);
+
+            return;
+        }
+
         const response = await axios.get(
             `/api/assessments/${assessmentId.value}/imports/${csvImportId.value}`,
         );
@@ -436,26 +474,30 @@ function resetCsvImport() {
     stopPolling();
     csvFiles.value = freshCsvFiles();
     csvImportId.value = null;
+    csvImportPromise = null;
     csvImportStatus.value = null;
     csvErrorsCount.value = 0;
     csvActionError.value = null;
 }
 
 async function useDemoScenario(scenario) {
+    stopPolling();
     demoScenario.value = scenario;
+    demoImportId.value = null;
     demoError.value = null;
     demoState.value = 'loading';
 
     try {
         await startAssessment();
 
-        await axios.post(`/api/assessments/${assessmentId.value}/imports`, {
+        const response = await axios.post(`/api/assessments/${assessmentId.value}/imports`, {
             provider: 'demo',
             scenario,
         });
 
-        demoState.value = 'done';
+        applyDemoImportSnapshot(response.data.data_import);
     } catch (error) {
+        stopPolling();
         demoState.value = 'error';
         demoError.value = 'We could not load that demo dataset. Please try again.';
     }
@@ -702,7 +744,7 @@ function importStatusLabel(status) {
                                         accept=".csv"
                                         class="sr-only"
                                         :data-testid="`csv-input-${dataType.key}`"
-                                        :disabled="isCsvProcessing"
+                                        :disabled="isCsvProcessing || isCsvUploading"
                                         @change="onCsvFileSelected(dataType.key, $event)"
                                     >
                                 </label>
@@ -728,7 +770,7 @@ function importStatusLabel(status) {
                                 type="button"
                                 data-testid="process-import"
                                 class="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-200 transition hover:bg-blue-700 disabled:opacity-40"
-                                :disabled="!hasAttachedCsvFile"
+                                :disabled="!hasAttachedCsvFile || isCsvUploading"
                                 @click="processCsvImport"
                             >
                                 Process import

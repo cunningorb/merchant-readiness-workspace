@@ -252,6 +252,44 @@ class ImportEndpointsTest extends TestCase
         $response->assertStatus(422);
     }
 
+    public function test_rejects_processing_an_import_without_attached_data_types(): void
+    {
+        $assessment = $this->assessment();
+        $importId = $this->postJson("/api/assessments/{$assessment->id}/imports", [
+            'provider' => 'csv',
+        ])->json('data_import.id');
+
+        $response = $this->postJson("/api/assessments/{$assessment->id}/imports/{$importId}/process");
+
+        $response->assertStatus(422);
+        $response->assertJsonPath('message', 'Cannot process an import without at least one attached data type.');
+        $this->assertDatabaseHas('data_imports', [
+            'id' => $importId,
+            'status' => ImportStatus::Created->value,
+        ]);
+    }
+
+    public function test_rejects_reprocessing_a_non_created_import(): void
+    {
+        Storage::fake('local');
+        $assessment = $this->assessment();
+        $importId = $this->postJson("/api/assessments/{$assessment->id}/imports", [
+            'provider' => 'csv',
+        ])->json('data_import.id');
+
+        $this->postJson("/api/assessments/{$assessment->id}/imports/{$importId}/files", [
+            'data_type' => 'catalog',
+            'file' => UploadedFile::fake()->createWithContent('products.csv', $this->validProductsCsv()),
+        ])->assertOk();
+
+        $this->postJson("/api/assessments/{$assessment->id}/imports/{$importId}/process")->assertOk();
+
+        $response = $this->postJson("/api/assessments/{$assessment->id}/imports/{$importId}/process");
+
+        $response->assertStatus(422);
+        $response->assertJsonPath('message', "This import has already been processed.");
+    }
+
     // --- Cancel ------------------------------------------------------------
 
     public function test_cancel_transitions_a_created_import_to_cancelled(): void

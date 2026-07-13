@@ -12,6 +12,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\DB;
 use Throwable;
 
 /**
@@ -51,7 +52,11 @@ abstract class ProcessImportJob implements ShouldQueue
             return;
         }
 
-        $this->markProcessing($dataImport);
+        $dataImport = $this->markProcessing($dataImport->id);
+
+        if ($dataImport === null) {
+            return;
+        }
 
         $failed = false;
         $importer = $this->resolveImporter($registry, $dataImport->provider);
@@ -79,18 +84,28 @@ abstract class ProcessImportJob implements ShouldQueue
      * flips queued -> importing (stamping started_at); every job then ensures
      * the import is marked processing. Terminal states are never overwritten.
      */
-    private function markProcessing(DataImport $dataImport): void
+    private function markProcessing(int $dataImportId): ?DataImport
     {
-        if (in_array($dataImport->status, [ImportStatus::Queued->value, ImportStatus::Validating->value], true)) {
-            $dataImport->status = ImportStatus::Importing->value;
-            $dataImport->started_at ??= now();
-            $dataImport->save();
-        }
+        return DB::transaction(function () use ($dataImportId) {
+            $dataImport = DataImport::query()->lockForUpdate()->find($dataImportId);
 
-        if ($dataImport->status === ImportStatus::Importing->value) {
-            $dataImport->status = ImportStatus::Processing->value;
-            $dataImport->save();
-        }
+            if ($dataImport === null || $dataImport->status === ImportStatus::Cancelled->value) {
+                return null;
+            }
+
+            if (in_array($dataImport->status, [ImportStatus::Queued->value, ImportStatus::Validating->value], true)) {
+                $dataImport->status = ImportStatus::Importing->value;
+                $dataImport->started_at ??= now();
+                $dataImport->save();
+            }
+
+            if ($dataImport->status === ImportStatus::Importing->value) {
+                $dataImport->status = ImportStatus::Processing->value;
+                $dataImport->save();
+            }
+
+            return $dataImport->fresh();
+        });
     }
 
     private function recordError(DataImport $dataImport, string $message): void

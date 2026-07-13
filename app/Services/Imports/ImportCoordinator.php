@@ -97,70 +97,82 @@ class ImportCoordinator
      */
     public function process(DataImport $dataImport): void
     {
-        $dataImport->refresh();
+        $jobs = DB::transaction(function () use ($dataImport) {
+            $dataImport = DataImport::query()->lockForUpdate()->findOrFail($dataImport->id);
 
-        $dataTypes = $dataImport->data_types ?? [];
-        $metadata = $dataImport->metadata ?? [];
-        $seeds = $metadata['fingerprint_seeds'] ?? [];
-
-        $everyDataTypeSeeded = $dataTypes !== [];
-        foreach ($dataTypes as $dataType) {
-            if (! array_key_exists($dataType, $seeds)) {
-                $everyDataTypeSeeded = false;
-                break;
+            if ($dataImport->status !== ImportStatus::Created->value) {
+                throw new LogicException("Cannot process an import with status '{$dataImport->status}'.");
             }
-        }
 
-        // Compute a fingerprint over whatever seeds are present, sorted by data
-        // type, so it is stored for audit even for imports that opt out of
-        // deduplication (e.g. demo imports, which never provide seeds).
-        $fingerprint = $this->fingerprintFor($dataImport, $dataTypes, $seeds);
-        $metadata['fingerprint'] = $fingerprint;
+            $dataTypes = $dataImport->data_types ?? [];
 
-        // Idempotency short-circuit: only when every attached data type provided
-        // a seed do we treat this as a content-addressable re-import and look
-        // for a prior successful import of the exact same content, for the same
-        // merchant, across any of that merchant's assessments.
-        if ($everyDataTypeSeeded) {
-            $existing = DataImport::query()
-                ->where('id', '!=', $dataImport->id)
-                ->where('metadata->fingerprint', $fingerprint)
-                ->whereIn('status', [
-                    ImportStatus::Completed->value,
-                    ImportStatus::CompletedWithWarnings->value,
-                ])
-                ->whereHas('assessment', function ($query) use ($dataImport) {
-                    $query->where('merchant_id', $dataImport->assessment->merchant_id);
-                })
-                ->first();
-
-            if ($existing !== null) {
-                $metadata['duplicate_of_import_id'] = $existing->id;
-                $dataImport->metadata = $metadata;
-                $dataImport->status = ImportStatus::Completed->value;
-                $dataImport->started_at = now();
-                $dataImport->completed_at = now();
-                $dataImport->save();
-
-                // Terminal: this stub's uploaded blobs are never parsed (the
-                // original import already holds the data), so drop them.
-                $this->deleteStoredFiles($dataImport);
-
-                return;
+            if ($dataTypes === []) {
+                throw new LogicException('Cannot process an import without at least one attached data type.');
             }
-        }
 
-        $metadata['pending_data_types'] = array_values($dataTypes);
-        $dataImport->metadata = $metadata;
+            $metadata = $dataImport->metadata ?? [];
+            $seeds = $metadata['fingerprint_seeds'] ?? [];
 
-        $dataImport->status = ImportStatus::Validating->value;
-        $dataImport->save();
+            $everyDataTypeSeeded = true;
+            foreach ($dataTypes as $dataType) {
+                if (! array_key_exists($dataType, $seeds)) {
+                    $everyDataTypeSeeded = false;
+                    break;
+                }
+            }
 
-        $dataImport->status = ImportStatus::Queued->value;
-        $dataImport->save();
+            // Compute a fingerprint over whatever seeds are present, sorted by data
+            // type, so it is stored for audit even for imports that opt out of
+            // deduplication (e.g. demo imports, which never provide seeds).
+            $fingerprint = $this->fingerprintFor($dataImport, $dataTypes, $seeds);
+            $metadata['fingerprint'] = $fingerprint;
 
-        foreach ($dataTypes as $dataType) {
-            $jobClass = self::JOBS[$dataType];
+            // Idempotency short-circuit: only when every attached data type provided
+            // a seed do we treat this as a content-addressable re-import and look
+            // for a prior successful import of the exact same content, for the same
+            // merchant, across any of that merchant's assessments.
+            if ($everyDataTypeSeeded) {
+                $existing = DataImport::query()
+                    ->where('id', '!=', $dataImport->id)
+                    ->where('metadata->fingerprint', $fingerprint)
+                    ->whereIn('status', [
+                        ImportStatus::Completed->value,
+                        ImportStatus::CompletedWithWarnings->value,
+                    ])
+                    ->whereHas('assessment', function ($query) use ($dataImport) {
+                        $query->where('merchant_id', $dataImport->assessment->merchant_id);
+                    })
+                    ->first();
+
+                if ($existing !== null) {
+                    $metadata['duplicate_of_import_id'] = $existing->id;
+                    $dataImport->metadata = $metadata;
+                    $dataImport->status = ImportStatus::Completed->value;
+                    $dataImport->started_at = now();
+                    $dataImport->completed_at = now();
+                    $dataImport->save();
+
+                    // Terminal: this stub's uploaded blobs are never parsed (the
+                    // original import already holds the data), so drop them.
+                    $this->deleteStoredFiles($dataImport);
+
+                    return [];
+                }
+            }
+
+            $metadata['pending_data_types'] = array_values($dataTypes);
+            $dataImport->metadata = $metadata;
+
+            $dataImport->status = ImportStatus::Validating->value;
+            $dataImport->save();
+
+            $dataImport->status = ImportStatus::Queued->value;
+            $dataImport->save();
+
+            return array_map(fn (string $dataType) => self::JOBS[$dataType], $dataTypes);
+        });
+
+        foreach ($jobs as $jobClass) {
             $jobClass::dispatch($dataImport->id);
         }
     }
@@ -173,23 +185,35 @@ class ImportCoordinator
      */
     public function cancel(DataImport $dataImport): void
     {
-        $cancellable = [
-            ImportStatus::Created->value,
-            ImportStatus::Validating->value,
-            ImportStatus::Queued->value,
-            ImportStatus::Importing->value,
-            ImportStatus::Processing->value,
-        ];
+        $cancelled = DB::transaction(function () use ($dataImport) {
+            $dataImport = DataImport::query()->lockForUpdate()->find($dataImport->id);
 
-        if (! in_array($dataImport->status, $cancellable, true)) {
-            return;
-        }
+            if ($dataImport === null) {
+                return null;
+            }
 
-        $dataImport->status = ImportStatus::Cancelled->value;
-        $dataImport->save();
+            $cancellable = [
+                ImportStatus::Created->value,
+                ImportStatus::Validating->value,
+                ImportStatus::Queued->value,
+                ImportStatus::Importing->value,
+                ImportStatus::Processing->value,
+            ];
+
+            if (! in_array($dataImport->status, $cancellable, true)) {
+                return null;
+            }
+
+            $dataImport->status = ImportStatus::Cancelled->value;
+            $dataImport->save();
+
+            return $dataImport;
+        });
 
         // Terminal: stored blobs are never read again once cancelled.
-        $this->deleteStoredFiles($dataImport);
+        if ($cancelled !== null) {
+            $this->deleteStoredFiles($cancelled);
+        }
     }
 
     /**

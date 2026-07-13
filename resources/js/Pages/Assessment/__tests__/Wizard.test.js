@@ -91,6 +91,13 @@ async function selectFile(testid, file) {
     await flushPromises();
 }
 
+function selectFileWithoutWaiting(testid, file) {
+    const input = wrapper.get(`[data-testid="${testid}"]`);
+    Object.defineProperty(input.element, 'files', { value: [file], configurable: true });
+
+    return input.trigger('change');
+}
+
 const csvFile = () => new File(['handle,title\nabc,Tee'], 'products.csv', { type: 'text/csv' });
 
 beforeEach(() => {
@@ -159,6 +166,81 @@ describe('Wizard import step — CSV path', () => {
 
         expect(postCallsEndingWith('/imports')).toHaveLength(1);
         expect(postCallsEndingWith('/files')).toHaveLength(2);
+    });
+
+    it('shares one in-flight csv import creation across simultaneous file selections', async () => {
+        let resolveCreateImport;
+        const createImportPromise = new Promise((resolve) => {
+            resolveCreateImport = resolve;
+        });
+
+        axios.post.mockImplementation((url) => {
+            if (url === '/api/assessments') {
+                return Promise.resolve({ data: { assessment: { id: 42 } } });
+            }
+            if (url.endsWith('/imports')) {
+                return createImportPromise;
+            }
+            if (url.endsWith('/files')) {
+                return Promise.resolve({ data: { data_import: { id: 7, status: 'created' } } });
+            }
+
+            return Promise.resolve({ data: {} });
+        });
+
+        mountWizard();
+        await reachImportStep();
+        await wrapper.get('[data-testid="choose-csv"]').trigger('click');
+
+        const first = selectFileWithoutWaiting('csv-input-catalog', csvFile());
+        const second = selectFileWithoutWaiting('csv-input-orders_returns', csvFile());
+        await flushPromises();
+
+        expect(postCallsEndingWith('/imports')).toHaveLength(1);
+
+        resolveCreateImport({ data: { data_import: { id: 7, status: 'created' } } });
+        await first;
+        await second;
+        await flushPromises();
+
+        expect(postCallsEndingWith('/imports')).toHaveLength(1);
+        expect(postCallsEndingWith('/files')).toHaveLength(2);
+    });
+
+    it('keeps Process import disabled while any selected file is still uploading', async () => {
+        let resolveUpload;
+        const uploadPromise = new Promise((resolve) => {
+            resolveUpload = resolve;
+        });
+
+        axios.post.mockImplementation((url) => {
+            if (url === '/api/assessments') {
+                return Promise.resolve({ data: { assessment: { id: 42 } } });
+            }
+            if (url.endsWith('/imports')) {
+                return Promise.resolve({ data: { data_import: { id: 7, status: 'created' } } });
+            }
+            if (url.endsWith('/files')) {
+                return uploadPromise;
+            }
+
+            return Promise.resolve({ data: {} });
+        });
+
+        mountWizard();
+        await reachImportStep();
+        await wrapper.get('[data-testid="choose-csv"]').trigger('click');
+
+        const upload = selectFileWithoutWaiting('csv-input-catalog', csvFile());
+        await flushPromises();
+
+        expect(wrapper.get('[data-testid="process-import"]').attributes('disabled')).toBeDefined();
+
+        resolveUpload({ data: { data_import: { id: 7, status: 'created' } } });
+        await upload;
+        await flushPromises();
+
+        expect(wrapper.get('[data-testid="process-import"]').attributes('disabled')).toBeUndefined();
     });
 
     it('surfaces the server validation message when a file upload fails', async () => {
@@ -368,6 +450,36 @@ describe('Wizard import step — demo path', () => {
         await wrapper.get('[data-testid="demo-continue"]').trigger('click');
         await flushPromises();
         expect(postCallsEndingWith('/submit')).toHaveLength(1);
+    });
+
+    it('waits for a queued demo import to complete before offering Continue', async () => {
+        vi.useFakeTimers();
+        mountWizard();
+        await reachImportStep();
+        await wrapper.get('[data-testid="choose-demo"]').trigger('click');
+
+        axios.post.mockImplementation((url, body) => {
+            if (url === '/api/assessments') {
+                return Promise.resolve({ data: { assessment: { id: 42 } } });
+            }
+            if (url.endsWith('/imports') && body?.provider === 'demo') {
+                return Promise.resolve({ data: { data_import: { id: 9, status: 'queued' } } });
+            }
+            return Promise.resolve({ data: {} });
+        });
+        axios.get.mockResolvedValue({ data: { data_import: { id: 9, status: 'completed' } } });
+
+        await wrapper.get('[data-testid="demo-apparel"]').trigger('click');
+        await flushPromises();
+
+        expect(wrapper.find('[data-testid="demo-loading"]').exists()).toBe(true);
+        expect(wrapper.find('[data-testid="demo-continue"]').exists()).toBe(false);
+
+        await vi.advanceTimersByTimeAsync(1500);
+
+        expect(axios.get).toHaveBeenCalledWith('/api/assessments/42/imports/9');
+        expect(wrapper.find('[data-testid="demo-done"]').exists()).toBe(true);
+        expect(wrapper.find('[data-testid="demo-continue"]').exists()).toBe(true);
     });
 });
 

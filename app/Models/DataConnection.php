@@ -25,6 +25,7 @@ class DataConnection extends Model
     protected function casts(): array
     {
         return [
+            'credentials' => 'encrypted:array',
             'granted_scopes' => 'array',
             'connected_at' => 'datetime',
             'disconnected_at' => 'datetime',

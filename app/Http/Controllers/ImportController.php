@@ -13,6 +13,7 @@ use App\Services\Imports\Demo\DemoDataProvider;
 use App\Services\Imports\ImportCoordinator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Storage;
+use LogicException;
 
 /**
  * Thin HTTP surface over ImportCoordinator's three-phase API plus file
@@ -110,7 +111,13 @@ class ImportController extends Controller
             ], 422);
         }
 
-        $coordinator->process($import);
+        try {
+            $coordinator->process($import);
+        } catch (LogicException $exception) {
+            return response()->json([
+                'message' => $exception->getMessage(),
+            ], 422);
+        }
 
         return $this->respondWithImport($import->fresh());
     }

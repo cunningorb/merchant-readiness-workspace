@@ -6,6 +6,7 @@ use App\Models\DataConnection;
 use App\Models\Merchant;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class DataConnectionTest extends TestCase
@@ -56,6 +57,21 @@ class DataConnectionTest extends TestCase
 
         $this->assertNull($fresh->credentials);
         $this->assertNull($fresh->disconnected_at);
+    }
+
+    public function test_credentials_are_encrypted_at_rest_and_cast_to_array(): void
+    {
+        $credentials = ['access_token' => 'shpat_secret', 'refresh_token' => 'refresh_secret'];
+
+        $connection = DataConnection::factory()->create([
+            'credentials' => $credentials,
+        ]);
+
+        $raw = DB::table('data_connections')->where('id', $connection->id)->value('credentials');
+
+        $this->assertIsString($raw);
+        $this->assertStringNotContainsString('shpat_secret', $raw);
+        $this->assertSame($credentials, $connection->fresh()->credentials);
     }
 
     public function test_factory_creates_valid_data_connection(): void
