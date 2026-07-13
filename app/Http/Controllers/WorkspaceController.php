@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\Assessment;
-use App\Models\Recommendation;
 use App\Services\AssessmentQuestionCatalog;
 use App\Services\ReportBuilderService;
 use Illuminate\Http\Request;
@@ -63,22 +62,7 @@ class WorkspaceController extends Controller
         $payload['merchant']['contact_email'] = $assessment->merchant->contact_email;
         $payload['merchant']['website'] = $assessment->merchant->website;
         $payload['submitted_at'] = $assessment->submitted_at;
-        $payload['talking_points'] = $assessment->recommendations
-            ->sortBy('id')
-            ->sortBy(fn (Recommendation $recommendation) => match ($recommendation->priority) {
-                'high' => 0,
-                'medium' => 1,
-                'low' => 2,
-                default => 3,
-            })
-            ->take(3)
-            ->values()
-            ->map(fn (Recommendation $recommendation) => [
-                'title' => $recommendation->title,
-                'description' => $recommendation->description,
-                'expected_impact' => $recommendation->expected_impact,
-            ])
-            ->all();
+        $payload['talking_points'] = $payload['talkingPoints'];
 
         return Inertia::render('Workspace/Show', [
             'report' => $payload,

@@ -63,7 +63,10 @@ class ReportBuilderServiceTest extends TestCase
 
     public function test_build_payload_includes_present_optional_profile_fields(): void
     {
-        $merchant = Merchant::factory()->create(['company_name' => 'Northwind Supply']);
+        $merchant = Merchant::factory()->create([
+            'company_name' => 'Northwind Supply',
+            'contact_email' => 'ops@northwind.test',
+        ]);
         $assessment = Assessment::factory()->for($merchant)->create();
 
         AssessmentAnswer::factory()->for($assessment)->create([
@@ -88,6 +91,7 @@ class ReportBuilderServiceTest extends TestCase
 
         $this->assertSame([
             'company_name' => 'Northwind Supply',
+            'contact_email' => 'ops@northwind.test',
             'monthly_order_volume' => '1,000-10,000',
             'sku_count' => '500-5,000',
             'ecommerce_platform' => 'Shopify',
@@ -96,14 +100,36 @@ class ReportBuilderServiceTest extends TestCase
 
     public function test_build_payload_omits_absent_optional_profile_fields(): void
     {
-        $merchant = Merchant::factory()->create(['company_name' => 'Northwind Supply']);
+        $merchant = Merchant::factory()->create([
+            'company_name' => 'Northwind Supply',
+            'contact_email' => null,
+        ]);
         $assessment = Assessment::factory()->for($merchant)->create();
 
         $service = app(ReportBuilderService::class);
         $report = $service->createForAssessment($assessment);
         $payload = $service->buildPayload($report);
 
-        $this->assertSame(['company_name' => 'Northwind Supply'], $payload['merchant']);
+        $this->assertSame(['company_name' => 'Northwind Supply', 'contact_email' => null], $payload['merchant']);
+    }
+
+    public function test_build_payload_includes_default_talking_point_before_recommendations(): void
+    {
+        $assessment = Assessment::factory()->create();
+        Recommendation::factory()->for($assessment)->create([
+            'title' => 'Automate return labels',
+            'description' => 'Label automation reduces manual work.',
+            'expected_impact' => 'Less manual label handling.',
+            'priority' => 'high',
+        ]);
+
+        $service = app(ReportBuilderService::class);
+        $report = $service->createForAssessment($assessment);
+        $payload = $service->buildPayload($report);
+
+        $this->assertCount(2, $payload['talkingPoints']);
+        $this->assertSame('See how automation and AI can level up your returns', $payload['talkingPoints'][0]['title']);
+        $this->assertSame('Automate return labels', $payload['talkingPoints'][1]['title']);
     }
 
     // --- heroOpportunity ---------------------------------------------------

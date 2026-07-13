@@ -14,7 +14,7 @@ const props = defineProps({
     },
 });
 
-defineEmits(['see-calculation']);
+defineEmits(['see-calculation', 'contact-sales']);
 
 const UNIT_LABELS = {
     hours_per_week: 'hours per week',
@@ -72,6 +72,14 @@ const quantifiedRange = computed(() => {
         <div class="mt-4 flex flex-wrap items-center gap-2">
             <ConfidenceBadge :level="opportunity.confidence" />
             <EffortBadge v-if="opportunity.effort" :level="opportunity.effort" />
+            <button
+                type="button"
+                data-testid="sales-contact-link"
+                class="inline-flex items-center rounded-full bg-blue-600 px-3 py-1 text-xs font-semibold text-white transition hover:bg-blue-700"
+                @click="$emit('contact-sales')"
+            >
+                Talk to the team
+            </button>
             <button
                 v-if="hasCalculation"
                 type="button"

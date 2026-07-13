@@ -68,6 +68,11 @@ const report = {
     },
     talking_points: [
         {
+            title: 'See how automation and AI can level up your returns',
+            description: 'Use this report as a starting point for where automation and AI can improve the returns experience for your customers and your business.',
+            expected_impact: 'A clearer path to faster returns workflows, better customer experience, and fewer manual bottlenecks.',
+        },
+        {
             title: 'Offer exchanges, not just refunds',
             description: 'Exchange conversion can retain revenue that would otherwise be lost to refunds.',
             expected_impact: 'Retain revenue currently lost to refund-only returns.',
@@ -118,6 +123,15 @@ describe('Workspace/Show', () => {
         const wrapper = mountShow();
 
         expect(wrapper.text()).toContain('Talking Points');
+        expect(wrapper.text()).toContain('See how automation and AI can level up your returns');
         expect(wrapper.text()).toContain('Offer exchanges, not just refunds');
+    });
+
+    it('opens the sales contact popup from the hero', async () => {
+        const wrapper = mountShow();
+
+        await wrapper.get('[data-testid="sales-contact-link"]').trigger('click');
+
+        expect(wrapper.get('[role="dialog"]').text()).toContain('A sales team member will be contacting them at hello@thistleandbloom.example shortly.');
     });
 });

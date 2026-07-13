@@ -101,4 +101,16 @@ describe('OpportunityHero', () => {
         await trigger.trigger('click');
         expect(withCalculation.emitted('see-calculation')).toHaveLength(1);
     });
+
+    it('always shows a sales contact link on the hero card', async () => {
+        const wrapper = mount(OpportunityHero, {
+            props: { opportunity: monetaryOpportunity },
+        });
+
+        const trigger = wrapper.get('[data-testid="sales-contact-link"]');
+        expect(trigger.text()).toContain('Talk to the team');
+
+        await trigger.trigger('click');
+        expect(wrapper.emitted('contact-sales')).toHaveLength(1);
+    });
 });

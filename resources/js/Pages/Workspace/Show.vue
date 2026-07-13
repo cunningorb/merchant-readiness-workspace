@@ -56,8 +56,11 @@ const enrichedMetrics = computed(() => props.report.supportingMetrics.map((metri
 })));
 
 const activeExplanationType = ref(null);
+const salesModalOpen = ref(false);
 const activeExplanation = computed(() =>
     activeExplanationType.value != null ? explanations.value[activeExplanationType.value] ?? null : null);
+
+const contactEmail = computed(() => props.report.merchant.contact_email || 'the email provided');
 
 function openCalculation(type) {
     if (type != null && explanations.value[type] != null) {
@@ -67,6 +70,14 @@ function openCalculation(type) {
 
 function closeCalculation() {
     activeExplanationType.value = null;
+}
+
+function openSalesContact() {
+    salesModalOpen.value = true;
+}
+
+function closeSalesContact() {
+    salesModalOpen.value = false;
 }
 </script>
 
@@ -91,6 +102,7 @@ function closeCalculation() {
                         :opportunity="report.heroOpportunity"
                         :has-calculation="heroHasCalculation"
                         @see-calculation="openCalculation(report.heroOpportunity.type)"
+                        @contact-sales="openSalesContact"
                     />
 
                     <SupportingMetricStrip :metrics="enrichedMetrics" />
@@ -119,6 +131,18 @@ function closeCalculation() {
                 </div>
 
                 <CalculationModal :open="activeExplanation !== null" :explanation="activeExplanation" @close="closeCalculation" />
+
+                <div v-if="salesModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4" role="dialog" aria-modal="true" aria-labelledby="sales-contact-heading">
+                    <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+                        <h2 id="sales-contact-heading" class="text-lg font-semibold text-slate-900">We’ll take it from here</h2>
+                        <p class="mt-3 text-sm leading-6 text-slate-600">
+                            A sales team member will be contacting them at <span class="font-semibold text-slate-900">{{ contactEmail }}</span> shortly.
+                        </p>
+                        <button type="button" class="mt-5 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700" @click="closeSalesContact">
+                            Got it
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
     </AuthenticatedLayout>

@@ -14,6 +14,7 @@ const recommendation = (title, category, priority, opportunityType = null) => ({
 const report = {
     merchant: {
         company_name: 'Northwind Supply',
+        contact_email: 'ops@northwind.test',
         monthly_order_volume: '1,000-10,000',
         ecommerce_platform: 'Shopify',
     },
@@ -100,6 +101,13 @@ const report = {
             benchmark_version: '1.0',
         },
     ],
+    talkingPoints: [
+        {
+            title: 'See how automation and AI can level up your returns',
+            description: 'Use this report as a starting point for where automation and AI can improve the returns experience for your customers and your business.',
+            expected_impact: 'A clearer path to faster returns workflows, better customer experience, and fewer manual bottlenecks.',
+        },
+    ],
 };
 
 const catalog = [
@@ -168,6 +176,16 @@ describe('Reports/Show', () => {
         expect(wrapper.text()).toContain('Plan next');
         expect(wrapper.text()).toContain('Enable instant exchanges');
         expect(wrapper.text()).toContain('Publish a returns FAQ');
+    });
+
+    it('shows the default talking point and opens the sales contact popup from the hero', async () => {
+        const wrapper = mountShow();
+
+        expect(wrapper.text()).toContain('See how automation and AI can level up your returns');
+
+        await wrapper.get('[data-testid="sales-contact-link"]').trigger('click');
+
+        expect(wrapper.get('[role="dialog"]').text()).toContain('A sales team member will be contacting you at ops@northwind.test shortly.');
     });
 
     it('keeps the full diagnostic breakdown demoted below the opportunity content', () => {

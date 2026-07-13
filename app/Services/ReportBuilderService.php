@@ -30,6 +30,12 @@ class ReportBuilderService
         AssessmentOpportunity::TYPE_SUPPORT_CONTACT_REDUCTION => 'Fewer support contacts',
     ];
 
+    private const DEFAULT_TALKING_POINT = [
+        'title' => 'See how automation and AI can level up your returns',
+        'description' => 'Use this report as a starting point for where automation and AI can improve the returns experience for your customers and your business.',
+        'expected_impact' => 'A clearer path to faster returns workflows, better customer experience, and fewer manual bottlenecks.',
+    ];
+
     public function __construct(
         private readonly OpportunityRankingService $ranking,
     ) {}
@@ -77,6 +83,7 @@ class ReportBuilderService
             'calculationExplanations' => $this->calculationExplanations($opportunities),
             'actionPlan' => $this->actionPlan($rankedRecommendations),
             'peerComparisons' => $this->peerComparisons($assessment->benchmarkComparisons),
+            'talkingPoints' => $this->talkingPoints($assessment->recommendations),
         ];
     }
 
@@ -88,7 +95,10 @@ class ReportBuilderService
             'ecommerce_platform' => $assessment->answerValue('platform.ecommerce_platform'),
         ], fn ($value) => $value !== null && $value !== '');
 
-        return array_merge(['company_name' => $assessment->merchant->company_name], $optional);
+        return array_merge([
+            'company_name' => $assessment->merchant->company_name,
+            'contact_email' => $assessment->merchant->contact_email,
+        ], $optional);
     }
 
     /**
@@ -266,6 +276,30 @@ class ReportBuilderService
             'this_week' => $thisWeek->pluck('title')->all(),
             'plan_next' => $planNext->pluck('title')->all(),
         ];
+    }
+
+    /**
+     * @param  Collection<int, Recommendation>  $recommendations
+     */
+    private function talkingPoints(Collection $recommendations): array
+    {
+        $prioritized = $recommendations
+            ->sortBy('id')
+            ->sortBy(fn (Recommendation $recommendation) => match ($recommendation->priority) {
+                'high' => 0,
+                'medium' => 1,
+                'low' => 2,
+                default => 3,
+            });
+
+        return collect([self::DEFAULT_TALKING_POINT])
+            ->merge($prioritized->take(3)->map(fn (Recommendation $recommendation) => [
+                'title' => $recommendation->title,
+                'description' => $recommendation->description,
+                'expected_impact' => $recommendation->expected_impact,
+            ]))
+            ->values()
+            ->all();
     }
 
     /**

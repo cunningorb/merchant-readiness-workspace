@@ -70,8 +70,11 @@ function confidenceFor(recommendation) {
 }
 
 const activeExplanationType = ref(null);
+const salesModalOpen = ref(false);
 const activeExplanation = computed(() =>
     activeExplanationType.value != null ? explanations.value[activeExplanationType.value] ?? null : null);
+
+const contactEmail = computed(() => props.report.merchant.contact_email || 'the email you provided');
 
 function openCalculation(type) {
     if (type != null && explanations.value[type] != null) {
@@ -81,6 +84,14 @@ function openCalculation(type) {
 
 function closeCalculation() {
     activeExplanationType.value = null;
+}
+
+function openSalesContact() {
+    salesModalOpen.value = true;
+}
+
+function closeSalesContact() {
+    salesModalOpen.value = false;
 }
 
 function printReport() {
@@ -114,9 +125,24 @@ function printReport() {
                     :opportunity="report.heroOpportunity"
                     :has-calculation="heroHasCalculation"
                     @see-calculation="openCalculation(report.heroOpportunity.type)"
+                    @contact-sales="openSalesContact"
                 />
 
                 <SupportingMetricStrip :metrics="enrichedMetrics" />
+
+                <section aria-labelledby="talking-points-heading" class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                    <h2 id="talking-points-heading" class="text-lg font-semibold text-slate-900">Talking points</h2>
+                    <ol class="mt-4 space-y-4">
+                        <li v-for="(point, index) in report.talkingPoints" :key="index" class="flex gap-3">
+                            <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-semibold text-blue-700">{{ index + 1 }}</span>
+                            <div>
+                                <p class="font-medium text-slate-900">{{ point.title }}</p>
+                                <p class="mt-1 text-sm text-slate-600">{{ point.description }}</p>
+                                <p class="mt-1 text-sm text-slate-500">Expected impact: {{ point.expected_impact }}</p>
+                            </div>
+                        </li>
+                    </ol>
+                </section>
 
                 <section v-if="primaryRecommendation" aria-labelledby="primary-action-heading" data-testid="primary-action">
                     <h2 id="primary-action-heading" class="sr-only">Primary recommended action</h2>
@@ -163,6 +189,18 @@ function printReport() {
             </div>
 
             <CalculationModal :open="activeExplanation !== null" :explanation="activeExplanation" @close="closeCalculation" />
+
+            <div v-if="salesModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4" role="dialog" aria-modal="true" aria-labelledby="sales-contact-heading">
+                <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+                    <h2 id="sales-contact-heading" class="text-lg font-semibold text-slate-900">We’ll take it from here</h2>
+                    <p class="mt-3 text-sm leading-6 text-slate-600">
+                        A sales team member will be contacting you at <span class="font-semibold text-slate-900">{{ contactEmail }}</span> shortly.
+                    </p>
+                    <button type="button" class="mt-5 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700" @click="closeSalesContact">
+                        Got it
+                    </button>
+                </div>
+            </div>
         </section>
     </main>
 </template>

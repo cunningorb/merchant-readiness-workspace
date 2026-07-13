@@ -151,10 +151,11 @@ class WorkspaceTest extends TestCase
             ->where('report.merchant.contact_email', 'jane@acme.com')
             ->where('report.merchant.website', 'acme.com')
             ->where('report.assessment.overall_score', 72)
-            ->has('report.talking_points', 3)
-            ->where('report.talking_points.0.title', 'High priority item')
-            ->where('report.talking_points.1.title', 'Second high priority item')
-            ->where('report.talking_points.2.title', 'Medium priority item')
+            ->has('report.talking_points', 4)
+            ->where('report.talking_points.0.title', 'See how automation and AI can level up your returns')
+            ->where('report.talking_points.1.title', 'High priority item')
+            ->where('report.talking_points.2.title', 'Second high priority item')
+            ->where('report.talking_points.3.title', 'Medium priority item')
         );
     }
 
