@@ -5,6 +5,7 @@ namespace Tests\Feature\Imports;
 use App\Enums\ImportStatus;
 use App\Models\Assessment;
 use App\Models\DataImportError;
+use App\Models\DataImportFile;
 use App\Models\Merchant;
 use App\Models\MerchantInventoryMetric;
 use App\Models\MerchantLocationMetric;
@@ -33,6 +34,14 @@ class ImportEndpointsTest extends TestCase
         return <<<'CSV'
         title,product_type,vendor,tags,description_length,status,variant_count,has_size_option,has_color_option,media_count,price,compare_at_price,sku,inventory_tracked
         Classic Tee,Apparel,Acme,"sale;new",120,active,4,true,true,5,19.99,24.99,TEE-001,true
+        CSV;
+    }
+
+    private function secondProductsCsv(): string
+    {
+        return <<<'CSV'
+        title,product_type,vendor,tags,description_length,status,variant_count,has_size_option,has_color_option,media_count,price,compare_at_price,sku,inventory_tracked
+        Premium Hoodie,Apparel,Acme,"warm;new",140,active,3,true,true,6,49.99,59.99,HOOD-002,true
         CSV;
     }
 
@@ -106,6 +115,99 @@ class ImportEndpointsTest extends TestCase
         $this->assertSame(1, MerchantReturnMetric::query()->where('source_import_id', $importId)->count());
         $this->assertSame(1, MerchantInventoryMetric::query()->where('source_import_id', $importId)->count());
         $this->assertSame(1, MerchantLocationMetric::query()->where('source_import_id', $importId)->count());
+    }
+
+    // --- Re-attaching a file for the same data type replaces it ---------------
+
+    public function test_reattaching_a_file_for_the_same_data_type_replaces_the_previous_one(): void
+    {
+        Storage::fake('local');
+        $assessment = $this->assessment();
+        $importId = $this->postJson("/api/assessments/{$assessment->id}/imports", [
+            'provider' => 'csv',
+        ])->json('data_import.id');
+
+        // First (wrong) catalog file, then a different (right) catalog file for
+        // the SAME data type, before process() runs.
+        $this->postJson("/api/assessments/{$assessment->id}/imports/{$importId}/files", [
+            'data_type' => 'catalog',
+            'file' => UploadedFile::fake()->createWithContent('wrong.csv', $this->validProductsCsv()),
+        ])->assertOk();
+
+        $this->postJson("/api/assessments/{$assessment->id}/imports/{$importId}/files", [
+            'data_type' => 'catalog',
+            'file' => UploadedFile::fake()->createWithContent('right.csv', $this->secondProductsCsv()),
+        ])->assertOk();
+
+        // Exactly one file row exists for this data type — the replacement.
+        $files = DataImportFile::query()
+            ->where('data_import_id', $importId)
+            ->where('data_type', 'catalog')
+            ->get();
+        $this->assertCount(1, $files);
+        $this->assertSame('right.csv', $files->first()->original_filename);
+
+        $this->postJson("/api/assessments/{$assessment->id}/imports/{$importId}/process")->assertOk();
+
+        // The SECOND file's content was parsed, not the first.
+        $this->assertSame(1, MerchantProduct::query()->where('title', 'Premium Hoodie')->count());
+        $this->assertSame(0, MerchantProduct::query()->where('title', 'Classic Tee')->count());
+    }
+
+    // --- Terminal imports delete their stored blobs ---------------------------
+
+    public function test_stored_files_are_deleted_once_an_import_reaches_a_terminal_status(): void
+    {
+        Storage::fake('local');
+        $assessment = $this->assessment();
+        $importId = $this->postJson("/api/assessments/{$assessment->id}/imports", [
+            'provider' => 'csv',
+        ])->json('data_import.id');
+
+        $this->postJson("/api/assessments/{$assessment->id}/imports/{$importId}/files", [
+            'data_type' => 'catalog',
+            'file' => UploadedFile::fake()->createWithContent('products.csv', $this->validProductsCsv()),
+        ])->assertOk();
+
+        $storedPath = DataImportFile::query()
+            ->where('data_import_id', $importId)
+            ->where('data_type', 'catalog')
+            ->value('stored_path');
+        Storage::disk('local')->assertExists($storedPath);
+
+        $this->postJson("/api/assessments/{$assessment->id}/imports/{$importId}/process")->assertOk();
+
+        $this->getJson("/api/assessments/{$assessment->id}/imports/{$importId}")
+            ->assertJsonPath('data_import.status', ImportStatus::Completed->value);
+
+        // The DataImportFile row is kept for audit, but the blob is gone.
+        Storage::disk('local')->assertMissing($storedPath);
+        $this->assertSame(1, DataImportFile::query()->where('data_import_id', $importId)->count());
+    }
+
+    public function test_cancelling_an_import_deletes_its_stored_blobs(): void
+    {
+        Storage::fake('local');
+        $assessment = $this->assessment();
+        $importId = $this->postJson("/api/assessments/{$assessment->id}/imports", [
+            'provider' => 'csv',
+        ])->json('data_import.id');
+
+        $this->postJson("/api/assessments/{$assessment->id}/imports/{$importId}/files", [
+            'data_type' => 'catalog',
+            'file' => UploadedFile::fake()->createWithContent('products.csv', $this->validProductsCsv()),
+        ])->assertOk();
+
+        $storedPath = DataImportFile::query()
+            ->where('data_import_id', $importId)
+            ->where('data_type', 'catalog')
+            ->value('stored_path');
+        Storage::disk('local')->assertExists($storedPath);
+
+        $this->postJson("/api/assessments/{$assessment->id}/imports/{$importId}/cancel")
+            ->assertJsonPath('data_import.status', ImportStatus::Cancelled->value);
+
+        Storage::disk('local')->assertMissing($storedPath);
     }
 
     // --- Validation ------------------------------------------------------------

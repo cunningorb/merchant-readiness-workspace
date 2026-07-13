@@ -6,6 +6,7 @@ use App\Enums\ImportStatus;
 use App\Models\Assessment;
 use App\Models\AssessmentAnswer;
 use App\Models\DataImport;
+use App\Models\Merchant;
 use App\Models\MerchantOrderMetric;
 use App\Models\MerchantProduct;
 use App\Services\Imports\AssessmentEvidenceService;
@@ -236,6 +237,45 @@ class AssessmentEvidenceServiceTest extends TestCase
         $record = $this->service()->mergedEvidence($assessment->fresh(['answers']))['catalog.sku_count'];
 
         $this->assertSame(2, $record->importedValue);
+    }
+
+    // --- duplicate stubs resolve to the original import's evidence -----------
+
+    public function test_duplicate_detected_import_resolves_evidence_from_the_original_import(): void
+    {
+        $merchant = Merchant::factory()->create();
+
+        // Assessment A: the genuine import that actually holds the metric/product rows.
+        $assessmentA = Assessment::factory()->create(['merchant_id' => $merchant->id]);
+        $originalImport = $this->completedImport($assessmentA, [
+            'metadata' => ['fingerprint' => 'abc123'],
+        ]);
+        MerchantOrderMetric::factory()->create([
+            'merchant_id' => $merchant->id,
+            'assessment_id' => $assessmentA->id,
+            'source_import_id' => $originalImport->id,
+            'annualized_order_volume' => 66000,
+        ]);
+        MerchantProduct::factory()->count(4)->create([
+            'merchant_id' => $merchant->id,
+            'source_import_id' => $originalImport->id,
+        ]);
+
+        // Assessment B (same merchant): a re-upload of the same file was
+        // detected as a duplicate — completed, but no rows of its own.
+        $assessmentB = Assessment::factory()->create(['merchant_id' => $merchant->id]);
+        $this->completedImport($assessmentB, [
+            'metadata' => [
+                'fingerprint' => 'abc123',
+                'duplicate_of_import_id' => $originalImport->id,
+            ],
+        ]);
+
+        $evidence = $this->service()->mergedEvidence($assessmentB->fresh(['answers']));
+
+        // Both evidence lookups follow the duplicate pointer to the original.
+        $this->assertSame(5500, $evidence['business.monthly_order_volume']->importedValue);
+        $this->assertSame(4, $evidence['catalog.sku_count']->importedValue);
     }
 
     // --- latestUsableImport --------------------------------------------------

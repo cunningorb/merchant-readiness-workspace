@@ -225,7 +225,7 @@ describe('Wizard import step — CSV path', () => {
         expect(axios.get).toHaveBeenCalledTimes(2);
     });
 
-    it('renders the completed_with_warnings outcome with a warnings count and Continue', async () => {
+    it('renders the completed_with_warnings outcome with a count derived from errors_count and Continue', async () => {
         mountWizard();
         await reachImportStep();
         await wrapper.get('[data-testid="choose-csv"]').trigger('click');
@@ -233,8 +233,10 @@ describe('Wizard import step — CSV path', () => {
 
         axios.post.mockImplementation((url) => {
             if (url.endsWith('/process')) {
+                // Realistic backend output: warnings_count is never populated
+                // (always 0); errors_count reflects the data types that failed.
                 return Promise.resolve({
-                    data: { data_import: { id: 7, status: 'completed_with_warnings', warnings_count: 3, errors_count: 0 } },
+                    data: { data_import: { id: 7, status: 'completed_with_warnings', warnings_count: 0, errors_count: 3 } },
                 });
             }
             if (url.endsWith('/submit')) {
@@ -247,7 +249,7 @@ describe('Wizard import step — CSV path', () => {
         await flushPromises();
 
         const result = wrapper.get('[data-testid="csv-result"]');
-        expect(result.text()).toContain('3 warning');
+        expect(result.text()).toContain('3 item');
         expect(wrapper.find('[data-testid="csv-continue"]').exists()).toBe(true);
 
         await wrapper.get('[data-testid="csv-continue"]').trigger('click');

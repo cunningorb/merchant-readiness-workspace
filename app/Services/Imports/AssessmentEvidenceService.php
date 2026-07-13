@@ -46,10 +46,43 @@ class AssessmentEvidenceService
 
     public function latestUsableImport(Assessment $assessment): ?DataImport
     {
-        return $assessment->dataImports()
+        $latest = $assessment->dataImports()
             ->whereIn('status', array_map(fn (ImportStatus $status) => $status->value, self::USABLE_STATUSES))
             ->orderByDesc('id')
             ->first();
+
+        return $this->resolveOriginal($latest);
+    }
+
+    /**
+     * A duplicate-detected import is stamped completed but writes no metric/
+     * product rows of its own — its evidence lives under the ORIGINAL import it
+     * duplicated (metadata.duplicate_of_import_id). Follow that pointer, guarding
+     * against a malformed cycle, so the queries below scope to the id that
+     * actually owns the rows rather than the empty duplicate stub.
+     */
+    private function resolveOriginal(?DataImport $import): ?DataImport
+    {
+        $seen = [];
+
+        while ($import !== null) {
+            $duplicateOf = $import->metadata['duplicate_of_import_id'] ?? null;
+
+            if ($duplicateOf === null || in_array($import->id, $seen, true)) {
+                return $import;
+            }
+
+            $seen[] = $import->id;
+            $original = DataImport::find($duplicateOf);
+
+            if ($original === null) {
+                return $import;
+            }
+
+            $import = $original;
+        }
+
+        return $import;
     }
 
     private function monthlyOrderVolumeFromImport(Assessment $assessment, ?DataImport $latestImport): ?int
@@ -58,8 +91,12 @@ class AssessmentEvidenceService
             return null;
         }
 
+        // Scope to the resolved import's own assessment, not necessarily the one
+        // being evaluated: when $latestImport is the original behind a duplicate
+        // stub, its metric rows belong to the assessment that first imported them
+        // (a different assessment for the same merchant).
         $metric = MerchantOrderMetric::query()
-            ->where('assessment_id', $assessment->id)
+            ->where('assessment_id', $latestImport->assessment_id)
             ->where('source_import_id', $latestImport->id)
             ->first();
 

@@ -53,7 +53,6 @@ const importMode = ref(null); // null | 'csv' | 'demo'
 const csvFiles = ref(freshCsvFiles());
 const csvImportId = ref(null);
 const csvImportStatus = ref(null); // null until process() is triggered
-const csvWarningsCount = ref(0);
 const csvErrorsCount = ref(0);
 const csvActionError = ref(null);
 const demoScenario = ref(null);
@@ -367,7 +366,6 @@ function uploadErrorMessage(error) {
 
 function applyImportSnapshot(dataImport) {
     csvImportStatus.value = dataImport.status;
-    csvWarningsCount.value = dataImport.warnings_count ?? 0;
     csvErrorsCount.value = dataImport.errors_count ?? 0;
 }
 
@@ -439,7 +437,6 @@ function resetCsvImport() {
     csvFiles.value = freshCsvFiles();
     csvImportId.value = null;
     csvImportStatus.value = null;
-    csvWarningsCount.value = 0;
     csvErrorsCount.value = 0;
     csvActionError.value = null;
 }
@@ -757,7 +754,7 @@ function importStatusLabel(status) {
                                 Your store data was imported. Your estimate will use these signals.
                             </div>
                             <div v-else-if="csvImportStatus === 'completed_with_warnings'" class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-                                Import finished with {{ csvWarningsCount }} warning(s). Some rows or files couldn't be used, but the rest were imported.
+                                Import finished, but {{ csvErrorsCount }} item(s) couldn't be used. The rest were imported and will be used in your estimate.
                             </div>
                             <div v-else-if="csvImportStatus === 'failed'" class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
                                 Import failed ({{ csvErrorsCount }} error(s)). None of the uploaded data could be used. You can try again or continue without it.

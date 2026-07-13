@@ -61,6 +61,24 @@ class ImportController extends Controller
         $dataType = $request->validated('data_type');
         $uploaded = $request->file('file');
 
+        // Re-attaching a file for a data_type REPLACES the previous one rather
+        // than appending. The importers locate "the file for this data type"
+        // with ->first(), so a second row would leave the importer parsing the
+        // stale first file while the fingerprint/UI reflect the second. Keeping
+        // exactly one row per data_type makes both unambiguous.
+        $existingFiles = DataImportFile::query()
+            ->where('data_import_id', $import->id)
+            ->where('data_type', $dataType)
+            ->get();
+
+        foreach ($existingFiles as $existingFile) {
+            if ($existingFile->stored_path !== null) {
+                Storage::disk('local')->delete($existingFile->stored_path);
+            }
+
+            $existingFile->delete();
+        }
+
         $storedPath = $uploaded->storeAs(
             "imports/{$import->id}",
             "{$dataType}-{$uploaded->getClientOriginalName()}",

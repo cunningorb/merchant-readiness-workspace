@@ -10,6 +10,7 @@ use App\Models\Assessment;
 use App\Models\DataConnection;
 use App\Models\DataImport;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use InvalidArgumentException;
 use LogicException;
 
@@ -141,6 +142,10 @@ class ImportCoordinator
                 $dataImport->completed_at = now();
                 $dataImport->save();
 
+                // Terminal: this stub's uploaded blobs are never parsed (the
+                // original import already holds the data), so drop them.
+                $this->deleteStoredFiles($dataImport);
+
                 return;
             }
         }
@@ -182,6 +187,9 @@ class ImportCoordinator
 
         $dataImport->status = ImportStatus::Cancelled->value;
         $dataImport->save();
+
+        // Terminal: stored blobs are never read again once cancelled.
+        $this->deleteStoredFiles($dataImport);
     }
 
     /**
@@ -217,7 +225,27 @@ class ImportCoordinator
             }
 
             $import->save();
+
+            // Terminal: the importers have finished parsing, so the stored blobs
+            // are never read again. Delete them (keeping the DB rows for audit).
+            if ($pending === []) {
+                $this->deleteStoredFiles($import);
+            }
         });
+    }
+
+    /**
+     * Delete the on-disk blob for each attached file once an import is terminal.
+     * The DataImportFile rows are kept for audit/history; only the file content
+     * on the local disk is removed. Best-effort: a missing file is a no-op.
+     */
+    private function deleteStoredFiles(DataImport $import): void
+    {
+        foreach ($import->files()->get() as $file) {
+            if ($file->stored_path !== null) {
+                Storage::disk('local')->delete($file->stored_path);
+            }
+        }
     }
 
     private function overallStatus(DataImport $import): string
