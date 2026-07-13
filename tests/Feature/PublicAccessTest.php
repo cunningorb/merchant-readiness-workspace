@@ -14,6 +14,23 @@ class PublicAccessTest extends TestCase
         $response = $this->get('/');
 
         $response->assertOk();
+        $response->assertInertia(fn ($page) => $page->component('Welcome'));
+    }
+
+    public function test_privacy_page_is_reachable_without_authentication(): void
+    {
+        $response = $this->get('/privacy');
+
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page->component('Legal/Privacy'));
+    }
+
+    public function test_terms_page_is_reachable_without_authentication(): void
+    {
+        $response = $this->get('/terms');
+
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page->component('Legal/Terms'));
     }
 
     public function test_dashboard_redirects_unauthenticated_users_to_login(): void

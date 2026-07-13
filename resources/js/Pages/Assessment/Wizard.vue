@@ -1,5 +1,6 @@
 <script setup>
 import axios from 'axios';
+import { Link } from '@inertiajs/vue3';
 import { computed, onMounted, onUnmounted, ref, watch, watchEffect } from 'vue';
 import AssessmentResults from './AssessmentResults.vue';
 
@@ -636,9 +637,16 @@ function importStatusLabel(status) {
                 <div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
                     <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                         <div class="max-w-2xl">
-                            <h2 class="text-2xl font-semibold tracking-tight">Get a more useful estimate from data you already have</h2>
+                            <h2 class="text-2xl font-semibold tracking-tight">Make the estimate sharper with data you already have</h2>
                             <p class="mt-3 text-slate-600">
-                                Connect read-only Shopify data or upload exports. We use aggregate catalog, order, return, and inventory signals. Customer identity data is not required.
+                                Connect read-only Shopify data later, or upload exports now. We use store-level catalog, order, return, and inventory signals. Customer identity data is not needed.
+                            </p>
+                            <p class="mt-2 text-sm text-slate-500">
+                                Review our
+                                <Link href="/privacy" class="font-medium text-blue-700 hover:text-blue-800">Privacy Policy</Link>
+                                and
+                                <Link href="/terms" class="font-medium text-blue-700 hover:text-blue-800">Terms</Link>
+                                before adding store data.
                             </p>
                         </div>
                         <button
@@ -660,7 +668,7 @@ function importStatusLabel(status) {
                                 <h3 class="text-base font-semibold text-slate-700">Connect Shopify</h3>
                                 <span class="rounded-full bg-slate-200 px-3 py-1 text-xs font-medium text-slate-600">Coming soon</span>
                             </div>
-                            <p class="mt-2 text-sm text-slate-500">Best estimate · Read-only data · Products, returns, and inventory · Approximately 2–5 minutes</p>
+                            <p class="mt-2 text-sm text-slate-500">Best estimate · Read-only data · Products, returns, and inventory · About 2-5 minutes</p>
                             <button
                                 type="button"
                                 data-testid="connect-shopify"
@@ -709,7 +717,7 @@ function importStatusLabel(status) {
                         <!-- Continue manually -->
                         <div class="rounded-2xl border border-slate-200 bg-white p-5">
                             <h3 class="text-base font-semibold text-slate-900">Continue manually</h3>
-                            <p class="mt-2 text-sm text-slate-600">Skip the data step and score using only your answers. You can always come back before submitting.</p>
+                            <p class="mt-2 text-sm text-slate-600">Skip the data step and score from your answers only. You can come back before submitting.</p>
                             <button
                                 type="button"
                                 data-testid="continue-manually"
@@ -726,7 +734,7 @@ function importStatusLabel(status) {
                     <!-- CSV upload panel -->
                     <div v-if="importMode === 'csv'" data-testid="csv-panel" class="mt-8 rounded-2xl border border-slate-200 bg-slate-50 p-5">
                         <h4 class="text-sm font-semibold text-slate-900">Upload CSV exports</h4>
-                        <p class="mt-1 text-sm text-slate-600">Add any of the three exports below. Each accepts a single .csv file.</p>
+                        <p class="mt-1 text-sm text-slate-600">Add any of the three exports below. Each one takes a single .csv file.</p>
 
                         <div class="mt-4 grid gap-3 sm:grid-cols-3">
                             <div
@@ -793,13 +801,13 @@ function importStatusLabel(status) {
                         <!-- Terminal outcomes -->
                         <div v-else-if="isCsvTerminal" class="mt-5" data-testid="csv-result">
                             <div v-if="csvImportStatus === 'completed'" class="rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-800">
-                                Your store data was imported. Your estimate will use these signals.
+                                Your store data is in. The estimate will use these signals.
                             </div>
                             <div v-else-if="csvImportStatus === 'completed_with_warnings'" class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-                                Import finished, but {{ csvErrorsCount }} item(s) couldn't be used. The rest were imported and will be used in your estimate.
+                                Import finished, but {{ csvErrorsCount }} item(s) could not be used. The rest made it in and will be used in your estimate.
                             </div>
                             <div v-else-if="csvImportStatus === 'failed'" class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
-                                Import failed ({{ csvErrorsCount }} error(s)). None of the uploaded data could be used. You can try again or continue without it.
+                                Import failed ({{ csvErrorsCount }} error(s)). None of the uploaded data could be used. You can try again or keep going without it.
                             </div>
 
                             <div class="mt-4 flex flex-wrap items-center gap-3">
@@ -842,7 +850,7 @@ function importStatusLabel(status) {
                     <!-- Demo panel -->
                     <div v-if="importMode === 'demo'" data-testid="demo-panel" class="mt-8 rounded-2xl border border-slate-200 bg-slate-50 p-5">
                         <h4 class="text-sm font-semibold text-slate-900">Load a demo dataset</h4>
-                        <p class="mt-1 text-sm text-slate-600">Synthetic sample data — clearly labeled and never presented as your real store.</p>
+                        <p class="mt-1 text-sm text-slate-600">Synthetic sample data, clearly labeled and never treated like your real store.</p>
 
                         <div class="mt-4 flex flex-wrap gap-3">
                             <button
@@ -892,6 +900,13 @@ function importStatusLabel(status) {
                     </div>
 
                     <p v-if="submitError" class="mt-3 text-right text-sm text-red-600" role="alert">{{ submitError }}</p>
+
+                    <p class="mt-6 text-center text-xs text-slate-500">
+                        By submitting, you acknowledge this assessment is heuristic and agree to the
+                        <Link href="/privacy" class="font-medium text-blue-700 hover:text-blue-800">Privacy Policy</Link>
+                        and
+                        <Link href="/terms" class="font-medium text-blue-700 hover:text-blue-800">Terms</Link>.
+                    </p>
                 </div>
             </template>
 

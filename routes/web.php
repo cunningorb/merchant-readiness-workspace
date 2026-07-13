@@ -11,6 +11,14 @@ Route::get('/', function () {
     return Inertia::render('Welcome');
 });
 
+Route::get('/privacy', function () {
+    return Inertia::render('Legal/Privacy');
+})->name('privacy');
+
+Route::get('/terms', function () {
+    return Inertia::render('Legal/Terms');
+})->name('terms');
+
 Route::get('/health', function () {
     return response()->json([
         'status' => 'ok',

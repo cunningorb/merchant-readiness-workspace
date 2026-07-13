@@ -33,11 +33,23 @@ const showingNavigationDropdown = ref(false);
                             <div
                                 class="hidden space-x-8 sm:-my-px sm:ms-10 sm:flex"
                             >
+                                <NavLink href="/" :active="false">
+                                    Home
+                                </NavLink>
+                                <NavLink href="/assessment" :active="route().current('assessment.wizard')">
+                                    Assessment
+                                </NavLink>
                                 <NavLink
                                     :href="route('dashboard')"
                                     :active="route().current('dashboard')"
                                 >
-                                    Dashboard
+                                    Workspace
+                                </NavLink>
+                                <NavLink href="/privacy" :active="route().current('privacy')">
+                                    Privacy
+                                </NavLink>
+                                <NavLink href="/terms" :active="route().current('terms')">
+                                    Terms
                                 </NavLink>
                             </div>
                         </div>
@@ -140,11 +152,23 @@ const showingNavigationDropdown = ref(false);
                     class="sm:hidden"
                 >
                     <div class="space-y-1 pb-3 pt-2">
+                        <ResponsiveNavLink href="/" :active="false">
+                            Home
+                        </ResponsiveNavLink>
+                        <ResponsiveNavLink href="/assessment" :active="route().current('assessment.wizard')">
+                            Assessment
+                        </ResponsiveNavLink>
                         <ResponsiveNavLink
                             :href="route('dashboard')"
                             :active="route().current('dashboard')"
                         >
-                            Dashboard
+                            Workspace
+                        </ResponsiveNavLink>
+                        <ResponsiveNavLink href="/privacy" :active="route().current('privacy')">
+                            Privacy
+                        </ResponsiveNavLink>
+                        <ResponsiveNavLink href="/terms" :active="route().current('terms')">
+                            Terms
                         </ResponsiveNavLink>
                     </div>
 

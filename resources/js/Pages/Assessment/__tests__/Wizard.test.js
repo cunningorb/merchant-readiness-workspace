@@ -116,7 +116,9 @@ describe('Wizard import step — reaching it', () => {
         mountWizard();
         await reachImportStep();
 
-        expect(wrapper.text()).toContain('Get a more useful estimate from data you already have');
+        expect(wrapper.text()).toContain('Make the estimate sharper with data you already have');
+        expect(wrapper.text()).toContain('Privacy Policy');
+        expect(wrapper.text()).toContain('Terms');
         expect(wrapper.find('[data-testid="choose-csv"]').exists()).toBe(true);
         expect(postCallsEndingWith('/submit')).toHaveLength(0);
         expect(postCallsEndingWith('/imports')).toHaveLength(0);
@@ -300,7 +302,7 @@ describe('Wizard import step — CSV path', () => {
 
         await vi.advanceTimersByTimeAsync(1500); // poll #2 -> completed, stop
         expect(axios.get).toHaveBeenCalledTimes(2);
-        expect(wrapper.get('[data-testid="csv-result"]').text()).toContain('Your store data was imported');
+        expect(wrapper.get('[data-testid="csv-result"]').text()).toContain('Your store data is in');
 
         // No further polls after the terminal status.
         await vi.advanceTimersByTimeAsync(4500);
