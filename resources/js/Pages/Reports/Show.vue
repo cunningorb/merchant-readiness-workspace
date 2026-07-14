@@ -135,19 +135,11 @@ function printReport() {
     window.print();
 }
 
-async function shareReport() {
-    if (navigator.share) {
-        await navigator.share({ title: 'Readiness Report', url: props.report.url });
-        return;
-    }
-
-    await navigator.clipboard?.writeText(props.report.url);
-}
 </script>
 
 <template>
     <main class="min-h-screen bg-slate-50 text-slate-900">
-        <ReportHeaderBar :company-name="report.merchant.company_name" @share="shareReport" @download="printReport" @contact-sales="openSalesContact" />
+        <ReportHeaderBar :company-name="report.merchant.company_name" :share-url="report.url" @download="printReport" @contact-sales="openSalesContact" />
 
         <section class="mx-auto max-w-6xl px-6 py-8 sm:px-8">
             <div class="mb-6">

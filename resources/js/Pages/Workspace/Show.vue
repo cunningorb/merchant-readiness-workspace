@@ -147,7 +147,7 @@ function printReport() {
     <Head :title="report.merchant.company_name" />
 
     <AuthenticatedLayout>
-        <ReportHeaderBar :company-name="report.merchant.company_name" :back-href="route('dashboard')" @download="printReport" @share="printReport" @contact-sales="handleSalesContact" />
+        <ReportHeaderBar :company-name="report.merchant.company_name" :share-url="report.url" :back-href="route('dashboard')" @download="printReport" @contact-sales="handleSalesContact" />
 
         <div class="py-8">
             <div class="mx-auto max-w-6xl sm:px-6 lg:px-8">

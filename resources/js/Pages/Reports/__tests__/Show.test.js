@@ -244,6 +244,27 @@ describe('Reports/Show', () => {
         expect(wrapper.get('[data-testid="primary-card-contact-sales"]').classes()).toContain('px-5');
     });
 
+    it('opens a share popup and copies the report link', async () => {
+        const writeText = vi.fn(() => Promise.resolve());
+        Object.defineProperty(navigator, 'clipboard', {
+            value: { writeText },
+            configurable: true,
+        });
+        const wrapper = mountShow();
+
+        await wrapper
+            .findAll('button')
+            .find((button) => button.text() === 'Share')
+            .trigger('click');
+
+        expect(wrapper.get('[aria-label="Share report"]').text()).toContain('https://example.com/reports/report-token');
+
+        await wrapper.get('[data-testid="copy-share-link"]').trigger('click');
+
+        expect(writeText).toHaveBeenCalledWith('https://example.com/reports/report-token');
+        expect(wrapper.get('[data-testid="copy-share-link"]').text()).toContain('Copied link');
+    });
+
     it('opens the calculation modal from a See calculation trigger and shows the matching explanation', async () => {
         const wrapper = mountShow();
 

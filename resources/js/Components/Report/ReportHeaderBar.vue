@@ -1,10 +1,26 @@
 <script setup>
+import { ref } from 'vue';
+
 defineProps({
     companyName: { type: String, required: true },
+    shareUrl: { type: String, required: true },
     backHref: { type: String, default: null },
 });
 
-defineEmits(['share', 'download', 'contact-sales']);
+defineEmits(['download', 'contact-sales']);
+
+const shareOpen = ref(false);
+const copied = ref(false);
+
+async function copyShareUrl(shareUrl) {
+    await navigator.clipboard?.writeText(shareUrl);
+    copied.value = true;
+}
+
+function toggleShare() {
+    shareOpen.value = !shareOpen.value;
+    copied.value = false;
+}
 </script>
 
 <template>
@@ -22,7 +38,21 @@ defineEmits(['share', 'download', 'contact-sales']);
                 <p class="truncate text-sm text-slate-500">{{ companyName }}</p>
             </div>
             <div class="flex flex-wrap items-center gap-2">
-                <button type="button" class="rounded-xl border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50" @click="$emit('share')">Share</button>
+                <div class="relative">
+                    <button type="button" class="rounded-xl border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50" aria-haspopup="dialog" :aria-expanded="shareOpen" @click="toggleShare">
+                        Share
+                    </button>
+                    <div v-if="shareOpen" class="absolute right-0 top-full z-40 mt-2 w-80 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-xl" role="dialog" aria-label="Share report">
+                        <p class="text-sm font-semibold text-slate-950">Share this report</p>
+                        <p class="mt-1 text-xs leading-5 text-slate-500">Anyone with this secure link can view the report.</p>
+                        <div class="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                            <p class="truncate">{{ shareUrl }}</p>
+                        </div>
+                        <button type="button" data-testid="copy-share-link" class="mt-3 w-full rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700" @click="copyShareUrl(shareUrl)">
+                            {{ copied ? 'Copied link' : 'Copy shareable link' }}
+                        </button>
+                    </div>
+                </div>
                 <button type="button" class="rounded-xl border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50" @click="$emit('download')">Download PDF</button>
                 <button type="button" data-testid="header-contact-sales" class="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700" @click="$emit('contact-sales')">Talk to the team</button>
             </div>

@@ -158,4 +158,26 @@ describe('Workspace/Show', () => {
         expect(wrapper.get('[role="dialog"]').text()).toContain('A sales team member will be contacting them at hello@thistleandbloom.example shortly.');
         expect(axios.post).toHaveBeenCalledWith('/api/reports/workspace-token/contact');
     });
+
+    it('opens a share popup instead of printing from the header share button', async () => {
+        const writeText = vi.fn(() => Promise.resolve());
+        Object.defineProperty(navigator, 'clipboard', {
+            value: { writeText },
+            configurable: true,
+        });
+        window.print = vi.fn();
+        const wrapper = mountShow();
+
+        await wrapper
+            .findAll('button')
+            .find((button) => button.text() === 'Share')
+            .trigger('click');
+
+        expect(window.print).not.toHaveBeenCalled();
+        expect(wrapper.get('[aria-label="Share report"]').text()).toContain('https://example.com/reports/workspace-token');
+
+        await wrapper.get('[data-testid="copy-share-link"]').trigger('click');
+
+        expect(writeText).toHaveBeenCalledWith('https://example.com/reports/workspace-token');
+    });
 });
