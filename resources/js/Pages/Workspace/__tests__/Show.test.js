@@ -1,6 +1,13 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { mount } from '@vue/test-utils';
+import axios from 'axios';
 import Show from '../Show.vue';
+
+vi.mock('axios', () => ({
+    default: {
+        post: vi.fn(() => Promise.resolve({ data: { status: 'queued' } })),
+    },
+}));
 
 vi.mock('@inertiajs/vue3', () => ({
     Head: { template: '<span />' },
@@ -17,6 +24,8 @@ vi.mock('../../../Layouts/AuthenticatedLayout.vue', () => ({
 }));
 
 const report = {
+    token: 'workspace-token',
+    url: 'https://example.com/reports/workspace-token',
     merchant: {
         company_name: 'Thistle & Bloom Apparel',
         contact_name: 'Priya Anand',
@@ -66,6 +75,18 @@ const report = {
             formula_version: '1.0',
         },
     },
+    topRecommendations: [
+        {
+            title: 'Offer exchanges, not just refunds',
+            description: 'Exchange conversion can retain revenue that would otherwise be lost to refunds.',
+            category: 'exchanges',
+            priority: 'high',
+            expected_impact: 'Retain revenue currently lost to refund-only returns.',
+            opportunity_type: 'retained_revenue',
+        },
+    ],
+    remainingRecommendations: [],
+    peerComparisons: [],
     talking_points: [
         {
             title: 'See how automation and AI can level up your returns',
@@ -115,16 +136,17 @@ describe('Workspace/Show', () => {
 
         expect(heroIndex).toBeGreaterThan(-1);
         expect(html).not.toContain('Full diagnostic breakdown');
-        expect(wrapper.text()).toContain('Your company could get back $105,000–$210,000 in revenue this year');
-        expect(wrapper.text()).not.toContain('Score breakdown');
+        expect(wrapper.text()).toContain('$105K - $210K');
+        expect(wrapper.text()).toContain('Score breakdown');
+        expect(wrapper.text()).toContain('Capability map');
         expect(wrapper.text()).not.toContain('Capability mapping');
     });
 
-    it('keeps talking points visible for internal follow-up', () => {
+    it('removes talking points from the internal report view', () => {
         const wrapper = mountShow();
 
-        expect(wrapper.text()).toContain('Talking Points');
-        expect(wrapper.text()).toContain('See how automation and AI can level up your returns');
+        expect(wrapper.text()).not.toContain('Talking Points');
+        expect(wrapper.text()).not.toContain('See how automation and AI can level up your returns');
         expect(wrapper.text()).toContain('Offer exchanges, not just refunds');
     });
 
@@ -134,5 +156,6 @@ describe('Workspace/Show', () => {
         await wrapper.get('[data-testid="sales-contact-link"]').trigger('click');
 
         expect(wrapper.get('[role="dialog"]').text()).toContain('A sales team member will be contacting them at hello@thistleandbloom.example shortly.');
+        expect(axios.post).toHaveBeenCalledWith('/api/reports/workspace-token/contact');
     });
 });

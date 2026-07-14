@@ -1,6 +1,13 @@
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { mount } from '@vue/test-utils';
+import axios from 'axios';
 import Show from '../Show.vue';
+
+vi.mock('axios', () => ({
+    default: {
+        post: vi.fn(() => Promise.resolve({ data: { status: 'queued' } })),
+    },
+}));
 
 const recommendation = (title, category, priority, opportunityType = null) => ({
     title,
@@ -12,6 +19,8 @@ const recommendation = (title, category, priority, opportunityType = null) => ({
 });
 
 const report = {
+    token: 'report-token',
+    url: 'https://example.com/reports/report-token',
     merchant: {
         company_name: 'Northwind Supply',
         contact_email: 'ops@northwind.test',
@@ -133,23 +142,27 @@ afterEach(() => {
 });
 
 describe('Reports/Show', () => {
-    it('orders the page hero first, then metrics, then the primary action', () => {
+    it('orders the compact report sections according to the issue plan', () => {
         const wrapper = mountShow();
         const html = wrapper.html();
 
         const heroIndex = html.indexOf('data-testid="opportunity-hero"');
-        const metricsIndex = html.indexOf('data-testid="metric-strip"');
-        const primaryIndex = html.indexOf('data-testid="primary-action"');
+        const summaryIndex = html.indexOf('Executive summary');
+        const scoreIndex = html.indexOf('Score breakdown');
+        const opportunitiesIndex = html.indexOf('Top opportunities');
+        const capabilityIndex = html.indexOf('Capability map');
 
         expect(heroIndex).toBeGreaterThan(-1);
-        expect(metricsIndex).toBeGreaterThan(heroIndex);
-        expect(primaryIndex).toBeGreaterThan(metricsIndex);
+        expect(summaryIndex).toBeGreaterThan(heroIndex);
+        expect(scoreIndex).toBeGreaterThan(summaryIndex);
+        expect(opportunitiesIndex).toBeGreaterThan(scoreIndex);
+        expect(capabilityIndex).toBeGreaterThan(opportunitiesIndex);
     });
 
     it('shows the hero opportunity headline range', () => {
         const wrapper = mountShow();
 
-        expect(wrapper.text()).toContain('$32,000–$51,000');
+        expect(wrapper.text()).toContain('$32K - $51K');
     });
 
     it('shows only three recommendations until the disclosure is expanded', async () => {
@@ -169,26 +182,29 @@ describe('Reports/Show', () => {
         expect(visibleCards()).toHaveLength(5);
     });
 
-    it('renders the action plan lists', () => {
+    it('renders condensed recommended improvements instead of the old action plan lists', () => {
         const wrapper = mountShow();
 
-        expect(wrapper.text()).toContain('Do this this week');
-        expect(wrapper.text()).toContain('Plan next');
+        expect(wrapper.text()).toContain('Recommended improvements');
         expect(wrapper.text()).toContain('Enable instant exchanges');
         expect(wrapper.text()).toContain('Publish a returns FAQ');
+        expect(wrapper.text()).not.toContain('Do this this week');
+        expect(wrapper.text()).not.toContain('Plan next');
     });
 
-    it('shows the default talking point and opens the sales contact popup from the hero', async () => {
+    it('removes talking points and opens the sales contact popup from the hero', async () => {
         const wrapper = mountShow();
 
-        expect(wrapper.text()).toContain('See how automation and AI can level up your returns');
+        expect(wrapper.text()).not.toContain('Talking points');
+        expect(wrapper.text()).not.toContain('See how automation and AI can level up your returns');
 
         await wrapper.get('[data-testid="sales-contact-link"]').trigger('click');
 
         expect(wrapper.get('[role="dialog"]').text()).toContain('A sales team member will be contacting you at ops@northwind.test shortly.');
+        expect(axios.post).toHaveBeenCalledWith('/api/reports/report-token/contact');
     });
 
-    it('does not render the legacy diagnostic breakdown surface', () => {
+    it('renders the new score breakdown and capability map without the legacy diagnostic wrapper', () => {
         const wrapper = mountShow();
         const html = wrapper.html();
 
@@ -196,22 +212,18 @@ describe('Reports/Show', () => {
 
         expect(heroIndex).toBeGreaterThan(-1);
         expect(html).not.toContain('Full diagnostic breakdown');
-        expect(wrapper.text()).not.toContain('Score breakdown');
+        expect(wrapper.text()).toContain('Score breakdown');
+        expect(wrapper.text()).toContain('Capability map');
         expect(wrapper.text()).not.toContain('Capability mapping');
     });
 
-    it('places the peer perspective section between the recommendations disclosure and the action plan', () => {
+    it('folds peer perspective into the executive summary and removes standalone peer panel', () => {
         const wrapper = mountShow();
-        const html = wrapper.html();
 
-        const disclosureIndex = html.indexOf('View all 2 recommendations');
-        const peerIndex = html.indexOf('data-testid="peer-perspective"');
-        const actionPlanIndex = html.indexOf('action-plan-heading');
-
-        expect(peerIndex).toBeGreaterThan(disclosureIndex);
-        expect(actionPlanIndex).toBeGreaterThan(peerIndex);
-        expect(wrapper.text()).toContain('Peer perspective');
-        expect(wrapper.text()).toContain('Illustrative benchmark');
+        expect(wrapper.find('[data-testid="peer-perspective"]').exists()).toBe(false);
+        expect(wrapper.text()).toContain('Top 28%');
+        expect(wrapper.text()).toContain('of Shopify peers');
+        expect(wrapper.text()).not.toContain('Peer perspective');
     });
 
     it('omits the peer perspective section entirely when there are no comparisons', () => {
@@ -222,6 +234,14 @@ describe('Reports/Show', () => {
 
         expect(wrapper.find('[data-testid="peer-perspective"]').exists()).toBe(false);
         expect(wrapper.text()).not.toContain('Peer perspective');
+    });
+
+    it('renders full-size contact buttons in the header hero and primary card', () => {
+        const wrapper = mountShow();
+
+        expect(wrapper.get('[data-testid="header-contact-sales"]').classes()).toContain('px-5');
+        expect(wrapper.get('[data-testid="sales-contact-link"]').classes()).toContain('px-5');
+        expect(wrapper.get('[data-testid="primary-card-contact-sales"]').classes()).toContain('px-5');
     });
 
     it('opens the calculation modal from a See calculation trigger and shows the matching explanation', async () => {

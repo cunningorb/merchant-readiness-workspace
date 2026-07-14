@@ -26,7 +26,7 @@ const props = defineProps({
     },
 });
 
-defineEmits(['see-calculation']);
+defineEmits(['see-calculation', 'contact-sales']);
 
 const PRIORITY_CLASSES = {
     high: 'border-blue-300 bg-blue-100 text-blue-800',
@@ -41,6 +41,20 @@ const priorityLabel = computed(() => {
 
     return `${priority.charAt(0).toUpperCase()}${priority.slice(1)} priority`;
 });
+
+const EYEBROWS = {
+    exchanges: 'Recommended vendor',
+    catalog: 'Catalog',
+    manual_operations: 'Automation',
+    platform: 'Automation',
+    return_policy: 'Policy',
+};
+
+const eyebrow = computed(() => {
+    const category = props.recommendation.category ?? 'recommended action';
+
+    return EYEBROWS[category] ?? category.replaceAll('_', ' ');
+});
 </script>
 
 <template>
@@ -50,7 +64,7 @@ const priorityLabel = computed(() => {
         :class="primary ? 'border-blue-300 p-6 ring-1 ring-blue-200 sm:p-7' : 'border-slate-200 p-5'"
     >
         <div class="flex flex-wrap items-center justify-between gap-2">
-            <p v-if="primary" class="text-xs font-semibold uppercase tracking-wide text-blue-600">Start here</p>
+            <p class="text-xs font-bold uppercase tracking-wide text-blue-600">{{ eyebrow }}</p>
             <span class="rounded-full border px-2.5 py-0.5 text-xs font-medium" :class="priorityClasses">
                 {{ priorityLabel }}
             </span>
@@ -61,7 +75,17 @@ const priorityLabel = computed(() => {
         </h3>
         <p class="mt-1 text-sm text-slate-600">{{ recommendation.description }}</p>
 
-        <div class="mt-3 flex flex-wrap items-center gap-2">
+        <div class="mt-5 border-t border-slate-100 pt-4">
+            <button
+                v-if="primary"
+                type="button"
+                data-testid="primary-card-contact-sales"
+                class="mb-4 inline-flex w-full items-center justify-center rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
+                @click="$emit('contact-sales')"
+            >
+                Talk to the team
+            </button>
+            <div class="flex flex-wrap items-center gap-2">
             <ConfidenceBadge v-if="confidence" :level="confidence" />
             <EffortBadge v-if="effort" :level="effort" />
             <button
@@ -72,6 +96,7 @@ const priorityLabel = computed(() => {
             >
                 See calculation
             </button>
+            </div>
         </div>
     </article>
 </template>

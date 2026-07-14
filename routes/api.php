@@ -11,6 +11,7 @@ Route::post('/assessments/{assessment}/answers', [AssessmentController::class, '
 Route::post('/assessments/{assessment}/website-scan', [WebsiteScanController::class, 'store'])->middleware('throttle:10,1');
 Route::post('/assessments/{assessment}/submit', [AssessmentController::class, 'submit'])->middleware('throttle:20,1');
 Route::get('/reports/{report:token}', [ReportController::class, 'apiShow']);
+Route::post('/reports/{report:token}/contact', [ReportController::class, 'contact'])->middleware('throttle:10,1');
 
 // These endpoints are anonymous (consistent with the anonymous-assessment
 // pattern) but, unlike answer-saving, accept file uploads — an unbounded
