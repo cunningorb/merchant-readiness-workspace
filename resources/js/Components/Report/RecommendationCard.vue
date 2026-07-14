@@ -63,20 +63,22 @@ const eyebrow = computed(() => {
         class="rounded-2xl border bg-white shadow-sm"
         :class="primary ? 'border-blue-300 p-6 ring-1 ring-blue-200 sm:p-7' : 'border-slate-200 p-5'"
     >
-        <div class="flex flex-wrap items-center justify-between gap-2">
-            <p class="text-xs font-bold uppercase tracking-wide text-blue-600">{{ eyebrow }}</p>
-            <span class="rounded-full border px-2.5 py-0.5 text-xs font-medium" :class="priorityClasses">
-                {{ priorityLabel }}
-            </span>
-        </div>
+        <div class="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+            <div class="min-w-0 md:flex-1" :class="primary ? 'md:max-w-[760px]' : ''">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <p class="text-xs font-bold uppercase tracking-wide text-blue-600">{{ eyebrow }}</p>
+                    <span class="rounded-full border px-2.5 py-0.5 text-xs font-medium" :class="priorityClasses">
+                        {{ priorityLabel }}
+                    </span>
+                </div>
 
-        <h3 class="mt-2 break-words font-semibold text-slate-900" :class="primary ? 'text-xl' : 'text-base'">
-            {{ recommendation.title }}
-        </h3>
-        <p class="mt-1 break-words text-sm text-slate-600">{{ recommendation.description }}</p>
+                <h3 class="mt-2 break-words font-semibold text-slate-900" :class="primary ? 'text-xl' : 'text-base'">
+                    {{ recommendation.title }}
+                </h3>
+                <p class="mt-1 break-words text-sm text-slate-600">{{ recommendation.description }}</p>
+            </div>
 
-        <div class="mt-5 border-t border-slate-100 pt-4">
-            <div v-if="primary" class="mb-4 flex justify-center">
+            <div v-if="primary" class="flex w-full shrink-0 justify-center md:w-[240px]">
                 <button
                     type="button"
                     data-testid="primary-card-contact-sales"
@@ -86,6 +88,9 @@ const eyebrow = computed(() => {
                     Talk to the team
                 </button>
             </div>
+        </div>
+
+        <div class="mt-5 border-t border-slate-100 pt-4">
             <div class="flex flex-wrap items-center gap-2">
                 <ConfidenceBadge v-if="confidence" :level="confidence" />
                 <EffortBadge v-if="effort" :level="effort" />

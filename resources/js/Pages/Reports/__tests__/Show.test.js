@@ -244,6 +244,7 @@ describe('Reports/Show', () => {
         expect(wrapper.get('[data-testid="primary-card-contact-sales"]').classes()).toContain('px-5');
         expect(wrapper.get('[data-testid="sales-contact-link"]').classes()).not.toContain('w-full');
         expect(wrapper.get('[data-testid="primary-card-contact-sales"]').classes()).not.toContain('w-full');
+        expect(wrapper.get('[data-testid="primary-card-contact-sales"]').element.parentElement.className).toContain('md:w-[240px]');
     });
 
     it('links the report header back to the public home page', () => {
