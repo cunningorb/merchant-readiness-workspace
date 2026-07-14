@@ -77,28 +77,28 @@ const impactChip = computed(() => {
         class="rounded-3xl border border-blue-100 bg-gradient-to-br from-blue-50 via-white to-white p-6 shadow-sm sm:p-8"
         aria-labelledby="opportunity-hero-heading"
     >
-        <div class="grid gap-8 md:grid-cols-[minmax(0,1fr),280px] md:items-center">
-            <div>
+        <div class="grid gap-8 md:grid-cols-[minmax(0,1fr),minmax(220px,280px)] md:items-center">
+            <div class="min-w-0">
                 <p class="inline-flex items-center rounded-full border border-blue-200 bg-blue-100 px-3 py-1 text-xs font-bold uppercase tracking-wide text-blue-700">
                     <span aria-hidden="true">⚡</span>
                     <span class="ml-1">Recommended switch</span>
                 </p>
 
-                <h2 v-if="kind === 'monetary'" id="opportunity-hero-heading" class="mt-4 text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">
+                <h2 v-if="kind === 'monetary'" id="opportunity-hero-heading" class="mt-4 text-2xl font-bold tracking-tight text-slate-950 break-words sm:text-3xl">
                     Your returns could be earning more with <span class="text-blue-600">{{ switchLabel }}</span>.
                 </h2>
 
                 <template v-else-if="kind === 'quantified'">
-                    <h2 id="opportunity-hero-heading" class="mt-4 text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">
+                    <h2 id="opportunity-hero-heading" class="mt-4 text-2xl font-bold tracking-tight text-slate-950 break-words sm:text-3xl">
                         {{ opportunity.title }}
                     </h2>
                 </template>
 
-                <h2 v-else id="opportunity-hero-heading" class="mt-4 text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">
+                <h2 v-else id="opportunity-hero-heading" class="mt-4 text-2xl font-bold tracking-tight text-slate-950 break-words sm:text-3xl">
                     {{ opportunity.title }}
                 </h2>
 
-                <p class="mt-3 max-w-2xl text-sm leading-6 text-slate-600">{{ opportunity.summary }}</p>
+                <p class="mt-3 max-w-2xl text-sm leading-6 text-slate-600 break-words">{{ opportunity.summary }}</p>
 
                 <div class="mt-5 flex flex-wrap items-center gap-2">
                     <span v-if="kind !== 'fallback'" class="inline-flex items-center rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">↗ {{ impactChip }}</span>
@@ -111,7 +111,7 @@ const impactChip = computed(() => {
                 </p>
             </div>
 
-            <div class="flex flex-col gap-3 md:items-end">
+            <div class="flex flex-col items-center justify-center gap-3 text-center">
                 <button
                     type="button"
                     data-testid="sales-contact-link"
@@ -123,7 +123,7 @@ const impactChip = computed(() => {
                 <button
                     v-if="hasCalculation"
                     type="button"
-                    class="inline-flex items-center justify-center rounded-xl border border-blue-200 bg-white px-5 py-2.5 text-sm font-semibold text-blue-700 shadow-sm transition hover:bg-blue-50"
+                    class="inline-flex max-w-full items-center justify-center rounded-xl border border-blue-200 bg-blue-100 px-5 py-2.5 text-center text-sm font-semibold text-blue-800 shadow-sm transition hover:bg-blue-200"
                     @click="$emit('see-calculation')"
                 >
                     See the calculation

@@ -109,6 +109,7 @@ describe('OpportunityHero', () => {
 
         const trigger = wrapper.get('[data-testid="sales-contact-link"]');
         expect(trigger.text()).toContain('Talk to the team');
+        expect(trigger.classes()).not.toContain('w-full');
 
         await trigger.trigger('click');
         expect(wrapper.emitted('contact-sales')).toHaveLength(1);
