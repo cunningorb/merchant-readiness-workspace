@@ -1,6 +1,4 @@
 <script setup>
-import ConfidenceBadge from './ConfidenceBadge.vue';
-
 defineProps({
     insight: {
         type: Object,
@@ -17,7 +15,7 @@ defineProps({
     >
         <div class="flex flex-wrap items-center justify-between gap-2">
             <p class="text-xs font-bold uppercase tracking-wide text-blue-600">Executive Perspective</p>
-            <ConfidenceBadge :level="insight.confidence" />
+            <span class="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700">AI Powered</span>
         </div>
 
         <h3 id="executive-perspective-heading" class="mt-3 text-lg font-semibold text-slate-900">{{ insight.headline }}</h3>

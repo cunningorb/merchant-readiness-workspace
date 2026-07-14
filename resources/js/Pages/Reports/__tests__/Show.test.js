@@ -332,7 +332,7 @@ describe('Reports/Show', () => {
         expect(insight.text()).toContain('Exchanges are quietly costing you revenue');
         expect(insight.text()).toContain('Exchange-first flows keep the sale instead of losing it to a refund.');
         expect(insight.text()).toContain('Default eligible returns into an exchange flow at checkout.');
-        expect(insight.text()).toContain('High confidence');
+        expect(insight.text()).toContain('AI Powered');
         expect(insight.text()).toContain('Generated from your assessment data and publicly available business information');
 
         const html = wrapper.html();
