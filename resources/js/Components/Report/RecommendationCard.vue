@@ -80,7 +80,7 @@ const eyebrow = computed(() => {
                 v-if="primary"
                 type="button"
                 data-testid="primary-card-contact-sales"
-                class="mb-4 inline-flex w-full items-center justify-center rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
+                class="mb-4 inline-flex w-full items-center justify-center rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 lg:w-1/2"
                 @click="$emit('contact-sales')"
             >
                 Talk to the team

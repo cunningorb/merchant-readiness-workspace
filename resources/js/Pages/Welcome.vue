@@ -29,8 +29,8 @@ import PublicLayout from '@/Layouts/PublicLayout.vue';
                 </p>
             </div>
 
-            <div class="rounded-[2rem] border border-blue-100 bg-white p-6 shadow-sm">
-                <div class="rounded-3xl bg-gradient-to-br from-blue-50 to-white p-6">
+            <div class="rounded-[2rem] border-2 border-blue-100 bg-gradient-to-br from-blue-50 via-white to-white p-8 shadow-sm">
+                <div>
                     <p class="text-sm font-semibold uppercase tracking-wide text-blue-700">What you leave with</p>
                     <dl class="mt-6 space-y-5">
                         <div>

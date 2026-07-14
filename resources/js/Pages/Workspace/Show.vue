@@ -95,6 +95,10 @@ const allRecommendations = computed(() => [
     ...displayTopRecommendations.value,
     ...(props.report.remainingRecommendations ?? []),
 ]);
+const EFFORT_ORDER = { low: 0, medium: 1, high: 2 };
+const recommendedImprovements = computed(() => [...allRecommendations.value]
+    .sort((a, b) => (EFFORT_ORDER[a.effort] ?? 3) - (EFFORT_ORDER[b.effort] ?? 3))
+    .slice(0, 3));
 
 const activeExplanationType = ref(null);
 const salesModalOpen = ref(false);
@@ -165,6 +169,20 @@ function printReport() {
                         @contact-sales="handleSalesContact"
                     />
 
+                    <section v-if="recommendedImprovements.length" class="max-w-3xl" aria-labelledby="recommended-improvements-heading">
+                        <p class="text-xs font-bold uppercase tracking-wide text-blue-600">Recommended improvements</p>
+                        <h2 id="recommended-improvements-heading" class="mt-2 text-2xl font-bold tracking-tight text-slate-950">Start with the changes most likely to clean up returns friction.</h2>
+                        <p class="mt-3 text-sm leading-6 text-slate-600">
+                            These are the first moves to discuss with the merchant's operations, support, and ecommerce teams. They prioritize practical workflow changes over broad platform replacement, so you can pressure-test the recommendations against their current policy, exchange behavior, and manual workload.
+                        </p>
+                        <ol class="mt-5 grid gap-3 sm:grid-cols-3">
+                            <li v-for="(item, index) in recommendedImprovements" :key="item.title" class="flex gap-3 text-sm text-slate-700">
+                                <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-700">{{ index + 1 }}</span>
+                                <span>{{ item.title }}</span>
+                            </li>
+                        </ol>
+                    </section>
+
                     <ExecutiveSummaryCard :report="report" />
                     <ScoreBreakdownCard :assessment="report.assessment" />
 
@@ -199,7 +217,7 @@ function printReport() {
 
                     <RecommendationsDisclosure v-if="remainingRecommendations.length" :recommendations="remainingRecommendations" :calculation-explanations="explanations" @see-calculation="openCalculation" />
 
-                    <CapabilityAndImprovements :assessment="report.assessment" :recommendations="allRecommendations" />
+                    <CapabilityAndImprovements :assessment="report.assessment" />
 
                 </div>
 

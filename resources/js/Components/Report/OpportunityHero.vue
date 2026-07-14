@@ -111,11 +111,11 @@ const impactChip = computed(() => {
                 </p>
             </div>
 
-            <div class="rounded-3xl border border-blue-100 bg-white p-5 text-center shadow-sm">
+            <div class="flex flex-col gap-3 md:items-end">
                 <button
                     type="button"
                     data-testid="sales-contact-link"
-                    class="inline-flex w-full items-center justify-center rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
+                    class="inline-flex items-center justify-center rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
                     @click="$emit('contact-sales')"
                 >
                     Talk to the team
@@ -123,7 +123,7 @@ const impactChip = computed(() => {
                 <button
                     v-if="hasCalculation"
                     type="button"
-                    class="mt-3 text-sm font-semibold text-blue-700 transition hover:text-blue-800"
+                    class="inline-flex items-center justify-center rounded-xl border border-blue-200 bg-white px-5 py-2.5 text-sm font-semibold text-blue-700 shadow-sm transition hover:bg-blue-50"
                     @click="$emit('see-calculation')"
                 >
                     See the calculation
