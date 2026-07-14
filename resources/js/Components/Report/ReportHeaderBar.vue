@@ -4,7 +4,7 @@ import { ref } from 'vue';
 defineProps({
     companyName: { type: String, required: true },
     shareUrl: { type: String, required: true },
-    backHref: { type: String, default: null },
+    backHref: { type: String, default: '/' },
 });
 
 defineEmits(['download', 'contact-sales']);
@@ -64,7 +64,7 @@ function toggleShare() {
     <header class="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur print:static print:hidden">
         <div class="mx-auto flex max-w-[1165px] flex-col gap-3 px-6 py-2 sm:flex-row sm:items-center sm:justify-between">
             <div class="flex min-w-0 items-center gap-3">
-                <a :href="backHref ?? '#'" class="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-blue-600 text-white transition hover:bg-blue-700" aria-label="Back">
+                <a :href="backHref" data-testid="report-back-link" class="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-blue-600 text-white transition hover:bg-blue-700" aria-label="Back">
                     <svg viewBox="0 0 20 20" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
                         <path d="M7.5 4.5H4.5v3" />
                         <path d="M4.8 7.2A6 6 0 1 1 6 15" stroke-linecap="round" />

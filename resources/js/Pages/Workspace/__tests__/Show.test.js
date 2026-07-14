@@ -150,6 +150,12 @@ describe('Workspace/Show', () => {
         expect(wrapper.text()).toContain('Offer exchanges, not just refunds');
     });
 
+    it('links the report header back to the dashboard', () => {
+        const wrapper = mountShow();
+
+        expect(wrapper.get('[data-testid="report-back-link"]').attributes('href')).toBe('/dashboard');
+    });
+
     it('opens the sales contact popup from the hero', async () => {
         const wrapper = mountShow();
 

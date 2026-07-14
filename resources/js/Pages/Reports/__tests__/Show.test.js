@@ -244,6 +244,12 @@ describe('Reports/Show', () => {
         expect(wrapper.get('[data-testid="primary-card-contact-sales"]').classes()).toContain('px-5');
     });
 
+    it('links the report header back to the public home page', () => {
+        const wrapper = mountShow();
+
+        expect(wrapper.get('[data-testid="report-back-link"]').attributes('href')).toBe('/');
+    });
+
     it('opens a share popup and copies the report link', async () => {
         const writeText = vi.fn(() => Promise.resolve());
         Object.defineProperty(navigator, 'clipboard', {
