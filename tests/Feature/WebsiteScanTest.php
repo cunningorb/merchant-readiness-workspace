@@ -6,6 +6,7 @@ use App\Models\Assessment;
 use App\Models\AssessmentAnswer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class WebsiteScanTest extends TestCase
@@ -15,27 +16,27 @@ class WebsiteScanTest extends TestCase
     public function test_scan_endpoint_stores_scan_evidence_and_merchant_url(): void
     {
         Http::fake([
-            'example.test/contact' => Http::response('<html><body>Email support@example.test for help.</body></html>'),
-            'example.test*' => Http::response('<html><head><title>Example Store</title></head><body><a href="/contact">Contact</a> Returns accepted within 45 days. Exchanges available.</body></html>'),
+            'example.com/contact' => Http::response('<html><body>Email support@example.com for help.</body></html>'),
+            'example.com*' => Http::response('<html><head><title>Example Store</title></head><body><a href="/contact">Contact</a> Returns accepted within 45 days. Exchanges available.</body></html>'),
         ]);
         $assessment = Assessment::factory()->create();
 
         $response = $this->postJson("/api/assessments/{$assessment->id}/website-scan", [
-            'url' => 'example.test',
+            'url' => 'example.com',
         ]);
 
         $response->assertCreated()
             ->assertJsonPath('website_scan.status', 'completed')
-            ->assertJsonPath('website_scan.url', 'https://example.test')
+            ->assertJsonPath('website_scan.url', 'https://example.com')
             ->assertJsonPath('website_scan.pages_scanned', 2)
-            ->assertJsonPath('merchant.website', 'https://example.test');
+            ->assertJsonPath('merchant.website', 'https://example.com');
 
         $evidence = $response->json('evidence');
         $this->assertSame('31-60 days', $evidence['return_policy.window_days'][0]['value']);
         $this->assertSame('Basic FAQ', $evidence['return_policy.policy_clarity'][0]['value']);
         $this->assertSame('website', $evidence['return_policy.window_days'][0]['source_type']);
         $this->assertTrue($evidence['exchanges.offered'][0]['value']);
-        $this->assertSame('support@example.test', $evidence['business.contact_email'][0]['value']);
+        $this->assertSame('support@example.com', $evidence['business.contact_email'][0]['value']);
         $this->assertSame('Custom automation', $evidence['platform.return_tools'][0]['value']);
         $this->assertContains('return_policy.window_days', collect($response->json('answers'))->pluck('question_key'));
         $this->assertContains('return_policy.policy_clarity', collect($response->json('answers'))->pluck('question_key'));
@@ -44,7 +45,7 @@ class WebsiteScanTest extends TestCase
 
         $this->assertDatabaseHas('website_scans', [
             'assessment_id' => $assessment->id,
-            'url' => 'https://example.test',
+            'url' => 'https://example.com',
             'pages_scanned' => 2,
         ]);
         $this->assertDatabaseHas('assessment_answer_evidence', [
@@ -69,16 +70,16 @@ class WebsiteScanTest extends TestCase
             'assessment_id' => $assessment->id,
             'question_key' => 'platform.return_tools',
         ]);
-        $this->assertSame('https://example.test', $assessment->fresh()->merchant->website);
+        $this->assertSame('https://example.com', $assessment->fresh()->merchant->website);
     }
 
     public function test_scan_prioritizes_return_policy_links_from_the_homepage(): void
     {
         Http::fake([
-            'https://example.test/contact' => Http::response('<html><body>Email support@example.test for help.</body></html>'),
-            'https://example.test/about' => Http::response('<html><body>About our brand.</body></html>'),
-            'https://example.test/pages/returns' => Http::response('<html><body><h1>Returns</h1><p>Returns are accepted within 30 days. Exchanges are available.</p></body></html>'),
-            'https://example.test*' => Http::response(<<<'HTML'
+            'https://example.com/contact' => Http::response('<html><body>Email support@example.com for help.</body></html>'),
+            'https://example.com/about' => Http::response('<html><body>About our brand.</body></html>'),
+            'https://example.com/pages/returns' => Http::response('<html><body><h1>Returns</h1><p>Returns are accepted within 30 days. Exchanges are available.</p></body></html>'),
+            'https://example.com*' => Http::response(<<<'HTML'
                 <html>
                     <head><title>Example Store</title></head>
                     <body>
@@ -92,7 +93,7 @@ class WebsiteScanTest extends TestCase
         $assessment = Assessment::factory()->create();
 
         $response = $this->postJson("/api/assessments/{$assessment->id}/website-scan", [
-            'url' => 'example.test',
+            'url' => 'example.com',
         ]);
 
         $response->assertCreated();
@@ -104,7 +105,7 @@ class WebsiteScanTest extends TestCase
         $this->assertTrue($evidence['exchanges.offered'][0]['value']);
 
         $this->assertSame(
-            'https://example.test/pages/returns',
+            'https://example.com/pages/returns',
             $evidence['return_policy.window_days'][0]['evidence_url'],
         );
     }
@@ -112,7 +113,7 @@ class WebsiteScanTest extends TestCase
     public function test_scan_autofill_does_not_replace_existing_answers(): void
     {
         Http::fake([
-            'example.test*' => Http::response('<html><body>Returns accepted within 45 days. Exchanges available.</body></html>'),
+            'example.com*' => Http::response('<html><body>Returns accepted within 45 days. Exchanges available.</body></html>'),
         ]);
         $assessment = Assessment::factory()->create();
         AssessmentAnswer::factory()->create([
@@ -123,7 +124,7 @@ class WebsiteScanTest extends TestCase
         ]);
 
         $this->postJson("/api/assessments/{$assessment->id}/website-scan", [
-            'url' => 'example.test',
+            'url' => 'example.com',
         ])->assertCreated();
 
         $this->assertSame(
@@ -135,13 +136,13 @@ class WebsiteScanTest extends TestCase
     public function test_different_scan_url_replaces_previous_website_filled_answers(): void
     {
         Http::fake([
-            'first.test*' => Http::response('<html><head><title>First Store</title></head><body>Email first@example.test for help.</body></html>'),
-            'second.test*' => Http::response('<html><head><title>Second Store</title></head><body>Email second@example.test for help.</body></html>'),
+            'example.com*' => Http::response('<html><head><title>First Store</title></head><body>Email first@example.com for help.</body></html>'),
+            'example.org*' => Http::response('<html><head><title>Second Store</title></head><body>Email second@example.org for help.</body></html>'),
         ]);
         $assessment = Assessment::factory()->create();
 
         $this->postJson("/api/assessments/{$assessment->id}/website-scan", [
-            'url' => 'first.test',
+            'url' => 'example.com',
         ])->assertCreated();
 
         $this->assertSame(
@@ -150,15 +151,15 @@ class WebsiteScanTest extends TestCase
         );
 
         $response = $this->postJson("/api/assessments/{$assessment->id}/website-scan", [
-            'url' => 'second.test',
+            'url' => 'example.org',
         ])->assertCreated();
 
         $answers = $assessment->fresh()->answers()->pluck('value', 'question_key');
 
         $this->assertSame('Second Store', $answers->get('business.company_name'));
-        $this->assertSame('second@example.test', $answers->get('business.contact_email'));
+        $this->assertSame('second@example.org', $answers->get('business.contact_email'));
         $this->assertNotContains(
-            'https://first.test',
+            'https://example.com',
             collect($response->json('evidence'))->flatMap(fn (array $records): array => $records)->pluck('evidence_url')->all(),
         );
     }
@@ -170,5 +171,32 @@ class WebsiteScanTest extends TestCase
         $this->postJson("/api/assessments/{$assessment->id}/website-scan", [])
             ->assertUnprocessable()
             ->assertJsonValidationErrors('url');
+    }
+
+    #[DataProvider('unsafeUrlProvider')]
+    public function test_scan_rejects_unsafe_urls_before_fetching(string $url): void
+    {
+        Http::fake();
+        $assessment = Assessment::factory()->create();
+
+        $this->postJson("/api/assessments/{$assessment->id}/website-scan", [
+            'url' => $url,
+        ])->assertUnprocessable()->assertJsonValidationErrors('url');
+
+        Http::assertNothingSent();
+    }
+
+    /**
+     * @return array<string, array{0: string}>
+     */
+    public static function unsafeUrlProvider(): array
+    {
+        return [
+            'metadata service' => ['http://169.254.169.254/latest/meta-data'],
+            'localhost' => ['http://localhost:8080/admin'],
+            'loopback ip' => ['http://127.0.0.1:8080/admin'],
+            'private ip' => ['http://192.168.1.10/admin'],
+            'non http scheme' => ['file:///etc/passwd'],
+        ];
     }
 }

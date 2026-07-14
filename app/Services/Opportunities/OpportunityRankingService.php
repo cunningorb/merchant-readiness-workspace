@@ -67,6 +67,12 @@ class OpportunityRankingService
 
         return $recommendations
             ->sort(function (Recommendation $a, Recommendation $b) use ($categoryMap, $opportunityByType) {
+                $priorityComparison = $this->priorityRank($a) <=> $this->priorityRank($b);
+
+                if ($priorityComparison !== 0) {
+                    return $priorityComparison;
+                }
+
                 $typeComparison = $this->recommendationTypeRank($a, $categoryMap, $opportunityByType)
                     <=> $this->recommendationTypeRank($b, $categoryMap, $opportunityByType);
 
@@ -79,12 +85,6 @@ class OpportunityRankingService
 
                 if ($confidenceComparison !== 0) {
                     return $confidenceComparison;
-                }
-
-                $priorityComparison = $this->priorityRank($a) <=> $this->priorityRank($b);
-
-                if ($priorityComparison !== 0) {
-                    return $priorityComparison;
                 }
 
                 return strcmp($a->title, $b->title);

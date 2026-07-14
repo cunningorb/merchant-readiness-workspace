@@ -2,6 +2,7 @@
 
 namespace App\Services\WebsiteScan;
 
+use App\Support\SafePublicHttpUrl;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Throwable;
@@ -48,6 +49,10 @@ class WebsiteCrawler
 
     private function fetch(string $url): mixed
     {
+        if (! SafePublicHttpUrl::isAllowed($url)) {
+            return null;
+        }
+
         return Http::timeout(5)
             ->connectTimeout(3)
             ->withHeaders([

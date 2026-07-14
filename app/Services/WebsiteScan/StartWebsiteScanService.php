@@ -5,7 +5,7 @@ namespace App\Services\WebsiteScan;
 use App\Models\Assessment;
 use App\Models\AssessmentAnswerEvidence;
 use App\Models\WebsiteScan;
-use Illuminate\Support\Str;
+use App\Support\SafePublicHttpUrl;
 
 class StartWebsiteScanService
 {
@@ -62,12 +62,6 @@ class StartWebsiteScanService
 
     private function normalizeUrl(string $url): string
     {
-        $url = trim($url);
-
-        if (! Str::startsWith($url, ['http://', 'https://'])) {
-            $url = 'https://'.$url;
-        }
-
-        return $url;
+        return SafePublicHttpUrl::normalize($url);
     }
 }

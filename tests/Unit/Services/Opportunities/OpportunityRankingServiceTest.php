@@ -112,21 +112,25 @@ class OpportunityRankingServiceTest extends TestCase
         );
     }
 
-    public function test_unmapped_category_ranks_after_mapped_categories(): void
+    public function test_platform_recommendations_map_to_manual_work_opportunity_and_respect_priority(): void
     {
         $opportunities = [
-            $this->opportunity(AssessmentOpportunity::TYPE_SUPPORT_CONTACT_REDUCTION, 10, 20),
+            $this->opportunity(AssessmentOpportunity::TYPE_MANUAL_WORK_SAVINGS, 10, 20),
         ];
 
         $platformRec = $this->recommendation('platform', 'high', 'Adopt returns app');
+        $manualRec = $this->recommendation('manual_operations', 'low', 'Document return workflow');
         $policyRec = $this->recommendation('return_policy', 'low', 'Clarify policy');
 
         $ranked = (new OpportunityRankingService)->rankRecommendations(
-            collect([$platformRec, $policyRec]),
+            collect([$manualRec, $policyRec, $platformRec]),
             $opportunities,
         );
 
-        $this->assertSame(['Clarify policy', 'Adopt returns app'], $ranked->pluck('title')->all());
+        $this->assertSame(
+            ['Adopt returns app', 'Document return workflow', 'Clarify policy'],
+            $ranked->pluck('title')->all(),
+        );
     }
 
     public function test_recommendation_still_ranked_by_type_when_linked_opportunity_missing_from_array(): void
