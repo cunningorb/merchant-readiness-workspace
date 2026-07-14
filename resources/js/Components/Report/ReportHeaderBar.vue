@@ -33,7 +33,7 @@ function toggleShare() {
                         <path d="M4.8 7.2A6 6 0 1 1 6 15" stroke-linecap="round" />
                     </svg>
                 </a>
-                <p class="text-sm font-bold text-slate-950">Readiness Report</p>
+                <p class="text-sm font-bold text-slate-950">Commerce Cartographer</p>
                 <span class="h-5 w-px bg-slate-200" aria-hidden="true"></span>
                 <p class="truncate text-sm text-slate-500">{{ companyName }}</p>
             </div>
