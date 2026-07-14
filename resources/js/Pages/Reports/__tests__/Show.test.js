@@ -265,6 +265,24 @@ describe('Reports/Show', () => {
         expect(wrapper.get('[data-testid="copy-share-link"]').text()).toContain('Copied link');
     });
 
+    it('falls back to document copy when clipboard api is unavailable', async () => {
+        Object.defineProperty(navigator, 'clipboard', {
+            value: undefined,
+            configurable: true,
+        });
+        document.execCommand = vi.fn(() => true);
+        const wrapper = mountShow();
+
+        await wrapper
+            .findAll('button')
+            .find((button) => button.text() === 'Share')
+            .trigger('click');
+        await wrapper.get('[data-testid="copy-share-link"]').trigger('click');
+
+        expect(document.execCommand).toHaveBeenCalledWith('copy');
+        expect(wrapper.get('[data-testid="copy-share-link"]').text()).toContain('Copied link');
+    });
+
     it('opens the calculation modal from a See calculation trigger and shows the matching explanation', async () => {
         const wrapper = mountShow();
 

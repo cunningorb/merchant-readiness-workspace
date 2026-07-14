@@ -11,15 +11,52 @@ defineEmits(['download', 'contact-sales']);
 
 const shareOpen = ref(false);
 const copied = ref(false);
+const copyFailed = ref(false);
 
 async function copyShareUrl(shareUrl) {
-    await navigator.clipboard?.writeText(shareUrl);
-    copied.value = true;
+    copied.value = false;
+    copyFailed.value = false;
+
+    try {
+        if (navigator.clipboard?.writeText) {
+            await navigator.clipboard.writeText(shareUrl);
+        } else {
+            fallbackCopy(shareUrl);
+        }
+
+        copied.value = true;
+    } catch {
+        try {
+            fallbackCopy(shareUrl);
+            copied.value = true;
+        } catch {
+            copyFailed.value = true;
+        }
+    }
+}
+
+function fallbackCopy(shareUrl) {
+    const input = document.createElement('textarea');
+    input.value = shareUrl;
+    input.setAttribute('readonly', '');
+    input.style.position = 'fixed';
+    input.style.opacity = '0';
+
+    document.body.appendChild(input);
+    input.select();
+
+    const copied = document.execCommand('copy');
+    document.body.removeChild(input);
+
+    if (!copied) {
+        throw new Error('Copy command failed.');
+    }
 }
 
 function toggleShare() {
     shareOpen.value = !shareOpen.value;
     copied.value = false;
+    copyFailed.value = false;
 }
 </script>
 
@@ -51,6 +88,7 @@ function toggleShare() {
                         <button type="button" data-testid="copy-share-link" class="mt-3 w-full rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700" @click="copyShareUrl(shareUrl)">
                             {{ copied ? 'Copied link' : 'Copy shareable link' }}
                         </button>
+                        <p v-if="copyFailed" class="mt-2 text-xs text-red-600">Copy failed. Select the link above and copy it manually.</p>
                     </div>
                 </div>
                 <button type="button" class="rounded-xl border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50" @click="$emit('download')">Download PDF</button>
