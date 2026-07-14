@@ -36,6 +36,21 @@ Report emails use Resend. Store `RESEND_KEY` as a secret environment variable in
 
 The Docker startup command runs `php artisan migrate --force` but does not run `php artisan db:seed --force`. Seed demo data or reset demo rows only as an explicit operator action, not on every production boot.
 
+## Optional Environment Variables (LLM-Assisted Features)
+
+Everything below is optional. Unset (or `LLM_ENABLED=false`), the website-scan LLM strategy and the Executive Perspective report card stay fully off with no behavior change — see `docs/llm-extraction.md` and `docs/decisions/0008-hybrid-rules-llm-extraction.md` / `0009-ai-recommendation-insight.md` for what each one does.
+
+- `WEBSITE_EXTRACTION_STRATEGY` — `rules` (default) | `llm` | `hybrid`
+- `LLM_ENABLED` — `true` to turn on the LLM path at all
+- `LLM_PROVIDER` — `groq` (only provider implemented today)
+- `LLM_TIMEOUT_SECONDS`, `LLM_MAX_INPUT_CHARACTERS`, `LLM_MAX_PAGES`, `LLM_DAILY_REQUEST_LIMIT` — website-scan tuning knobs
+- `GROQ_API_KEY` — set as a secret, never in the repo
+- `GROQ_BASE_URL` — defaults to Groq's OpenAI-compatible endpoint if unset
+- `GROQ_MODEL` — **must** be a model that supports Groq's structured JSON output. As of this writing only `openai/gpt-oss-20b` and `openai/gpt-oss-120b` support strict schema mode on Groq; other models (e.g. `llama-3.3-70b-versatile`) fall back to unstructured JSON mode and reliably fail this app's evidence-verification step, so the LLM path silently contributes nothing even though it's "enabled." Verify against Groq's current supported-models page before picking a different one.
+- `AI_RECOMMENDATION_INSIGHT_ENABLED`, `AI_RECOMMENDATION_INSIGHT_CACHE_TTL_HOURS`, `AI_RECOMMENDATION_INSIGHT_MAX_SECONDS` — Executive Perspective tuning knobs
+
+In `render.yaml` all of these are declared `sync: false`, meaning Render will never reset a value entered in the dashboard back to something in the blueprint — set them once there and they stick across deploys.
+
 Generate `APP_KEY` with a Laravel environment before deploying production traffic:
 
 ```bash
