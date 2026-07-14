@@ -1,6 +1,10 @@
 <?php
 
 return [
+    'website_extraction' => [
+        'strategy' => env('WEBSITE_EXTRACTION_STRATEGY', 'rules'),
+    ],
+
     'opportunities' => [
         'formula_version' => '1.0',
 
@@ -51,6 +55,7 @@ return [
         'recommendation_category_to_opportunity_type' => [
             'exchanges' => 'retained_revenue',
             'manual_operations' => 'manual_work_savings',
+            'platform' => 'manual_work_savings',
             'return_policy' => 'support_contact_reduction',
         ],
     ],

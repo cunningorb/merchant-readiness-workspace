@@ -4,8 +4,10 @@ namespace Tests\Feature;
 
 use App\Models\Assessment;
 use App\Models\AssessmentAnswer;
+use App\Models\AssessmentAnswerEvidence;
 use App\Models\Merchant;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Inertia\Testing\AssertableInertia;
 use Tests\TestCase;
 
 class PublicAssessmentWizardTest extends TestCase
@@ -25,8 +27,54 @@ class PublicAssessmentWizardTest extends TestCase
             ->assertCreated()
             ->assertJsonPath('assessment.status', 'draft');
 
+        $assessmentId = $response->json('assessment.id');
+
+        $this->assertSame(route('assessment.resume', $assessmentId), $response->json('assessment.resume_url'));
+
         $this->assertDatabaseHas('assessments', ['status' => 'draft']);
         $this->assertDatabaseHas('merchants', ['company_name' => 'Anonymous merchant']);
+    }
+
+    public function test_assessment_creation_is_rate_limited(): void
+    {
+        for ($i = 0; $i < 20; $i++) {
+            $this->postJson('/api/assessments')->assertCreated();
+        }
+
+        $this->postJson('/api/assessments')->assertTooManyRequests();
+    }
+
+    public function test_anonymous_visitor_can_resume_draft_assessment_by_url(): void
+    {
+        $merchant = Merchant::factory()->create(['website' => 'https://example.test']);
+        $assessment = Assessment::factory()->for($merchant)->create(['status' => 'draft']);
+        AssessmentAnswer::factory()->for($assessment)->create([
+            'question_key' => 'business.company_name',
+            'section' => 'business',
+            'value' => 'Northwind Supply',
+        ]);
+        AssessmentAnswerEvidence::factory()->for($assessment)->create([
+            'question_key' => 'business.company_name',
+            'source_type' => 'website',
+            'source_label' => 'Website scan',
+            'value' => 'Northwind Supply',
+            'evidence_url' => 'https://example.test',
+        ]);
+
+        $this->get(route('assessment.resume', $assessment))
+            ->assertOk()
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->component('Assessment/Wizard')
+                ->where('initialAssessment.id', $assessment->id)
+                ->where('initialAssessment.status', 'draft')
+                ->where('initialAssessment.resume_url', route('assessment.resume', $assessment))
+                ->where('initialAssessment.answers.0.question_key', 'business.company_name')
+                ->where('initialAssessment.answers.0.value', 'Northwind Supply')
+                ->where('initialAssessment.evidence', fn ($evidence): bool =>
+                    $evidence['business.company_name'][0]['value'] === 'Northwind Supply')
+                ->where('initialAssessment.merchant.website', 'https://example.test')
+                ->etc()
+            );
     }
 
     public function test_draft_answers_are_validated_and_saved_by_question_key(): void
@@ -79,7 +127,21 @@ class PublicAssessmentWizardTest extends TestCase
         ])->assertUnprocessable();
     }
 
-    public function test_required_answers_cannot_be_blank(): void
+    public function test_blank_draft_answers_are_ignored_for_partial_autosave(): void
+    {
+        $assessment = Assessment::factory()->create();
+
+        $this->postJson("/api/assessments/{$assessment->id}/answers", [
+            'answers' => [
+                ['question_key' => 'business.company_name', 'value' => ''],
+                ['question_key' => 'catalog.fit_sensitive_categories', 'value' => []],
+            ],
+        ])->assertOk()->assertJsonPath('assessment.answers_count', 0);
+
+        $this->assertDatabaseCount('assessment_answers', 0);
+    }
+
+    public function test_submit_still_requires_blank_required_answers_to_be_completed(): void
     {
         $assessment = Assessment::factory()->create();
 
@@ -87,7 +149,11 @@ class PublicAssessmentWizardTest extends TestCase
             'answers' => [
                 ['question_key' => 'business.company_name', 'value' => ''],
             ],
-        ])->assertUnprocessable();
+        ])->assertOk();
+
+        $this->postJson("/api/assessments/{$assessment->id}/submit")
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['business.company_name']);
     }
 
     public function test_multiselect_answers_must_only_contain_allowed_options(): void
@@ -125,7 +191,7 @@ class PublicAssessmentWizardTest extends TestCase
         ])->assertUnprocessable();
     }
 
-    public function test_null_answers_are_rejected_before_database_write(): void
+    public function test_null_draft_answers_are_ignored_before_database_write(): void
     {
         $assessment = Assessment::factory()->create();
 
@@ -133,7 +199,7 @@ class PublicAssessmentWizardTest extends TestCase
             'answers' => [
                 ['question_key' => 'catalog.fit_sensitive_categories', 'value' => null],
             ],
-        ])->assertUnprocessable();
+        ])->assertOk()->assertJsonPath('assessment.answers_count', 0);
 
         $this->assertDatabaseCount('assessment_answers', 0);
     }

@@ -25,22 +25,91 @@ const DEMO_SCENARIOS = [
     { key: 'home_goods', label: 'Home-goods small merchant' },
 ];
 
+const WEBSITE_SCAN_QUESTION_KEYS = [
+    'business.company_name',
+    'business.contact_email',
+    'platform.ecommerce_platform',
+    'platform.return_tools',
+    'return_policy.window_days',
+    'return_policy.policy_clarity',
+    'exchanges.offered',
+];
+
+const ASSISTED_STEPS = [
+    {
+        key: 'profile',
+        label: 'Profile',
+        eyebrow: 'Step 1',
+        title: 'Start with what your storefront already says',
+        description: 'Scan your site for public policy and platform signals, then fill in the business basics that need a person.',
+        sectionKeys: ['business', 'platform'],
+        questionKeys: ['business.company_name', 'business.contact_email', 'platform.ecommerce_platform', 'platform.return_tools'],
+        websiteScan: true,
+        websiteScanLabel: 'Store website',
+        websiteScanHelp: 'We scan public pages only and show the evidence before scoring.',
+        websiteScanPlaceholder: 'example.com',
+        websiteScanButton: 'Scan site',
+    },
+    {
+        key: 'catalog',
+        label: 'Catalog',
+        eyebrow: 'Step 2',
+        title: 'Add product complexity signals',
+        description: 'Product and order exports help sharpen SKU, category, and order-volume assumptions. Manual answers still override imported signals.',
+        sectionKeys: ['business', 'catalog'],
+        questionKeys: ['business.monthly_order_volume', 'catalog.sku_count', 'catalog.fit_sensitive_categories'],
+        csvDataTypes: ['catalog', 'orders_returns'],
+    },
+    {
+        key: 'policy',
+        label: 'Policy',
+        eyebrow: 'Step 3',
+        title: 'Confirm return and exchange rules',
+        description: 'Use the public return policy page to prefill policy answers, then review anything the scan cannot infer.',
+        sectionKeys: ['return_policy', 'exchanges'],
+        websiteScan: true,
+        websiteScanLabel: 'Return policy URL',
+        websiteScanHelp: 'Paste the policy page if it is different from the storefront URL. Public policy text is used only to suggest answers.',
+        websiteScanPlaceholder: 'example.com/pages/returns',
+        websiteScanButton: 'Scan policy',
+        hideWebsiteScanWhenComplete: true,
+    },
+    {
+        key: 'operations',
+        label: 'Operations',
+        eyebrow: 'Step 4',
+        title: 'Round out operational effort',
+        description: 'Manual handling and inventory context show where automation could remove friction.',
+        sectionKeys: ['manual_operations'],
+        csvDataTypes: ['inventory_locations'],
+    },
+];
+
 const props = defineProps({
     catalog: {
         type: Array,
         required: true,
     },
+    initialAssessment: {
+        type: Object,
+        default: null,
+    },
 });
 
 const currentSectionIndex = ref(0);
-const assessmentId = ref(null);
-const answers = ref({});
+const assessmentId = ref(props.initialAssessment?.id ?? null);
+const answers = ref(initialAnswers());
 const status = ref('');
 const errors = ref({});
 const submitResult = ref(null);
 const submitError = ref(null);
 const isSubmitting = ref(false);
 const isMounted = ref(false);
+const manualEntryOpen = ref(false);
+const websiteUrl = ref(props.initialAssessment?.merchant?.website ?? '');
+const websiteScanState = ref('idle');
+const websiteScanError = ref(null);
+const websiteEvidence = ref(props.initialAssessment?.evidence ?? {});
 
 // Explicit three-phase model. 'results' is reached only as a side effect of a
 // successful submitAssessment() (see the submitResult watcher below), so this
@@ -54,9 +123,9 @@ const importMode = ref(null); // null | 'csv' | 'demo'
 const csvFiles = ref(freshCsvFiles());
 const csvImportId = ref(null);
 const csvImportStatus = ref(null); // null until process() is triggered
+const csvWarningsCount = ref(0);
 const csvErrorsCount = ref(0);
 const csvActionError = ref(null);
-let csvImportPromise = null;
 const demoScenario = ref(null);
 const demoImportId = ref(null);
 const demoState = ref('idle'); // idle | loading | done | error
@@ -68,12 +137,28 @@ let savePromise = null;
 let pendingSectionIndex = null;
 let startPromise = null;
 
-const currentSection = computed(() => props.catalog[currentSectionIndex.value]);
-const isLastSection = computed(() => currentSectionIndex.value === props.catalog.length - 1);
+const currentStep = computed(() => ASSISTED_STEPS[currentSectionIndex.value]);
+const assistedStepCount = computed(() => ASSISTED_STEPS.length);
+const isLastSection = computed(() => currentSectionIndex.value === ASSISTED_STEPS.length - 1);
+const currentStepSections = computed(() => currentStep.value.sectionKeys
+    .map((sectionKey) => {
+        const section = props.catalog.find((candidate) => candidate.key === sectionKey);
 
-const hasAttachedCsvFile = computed(() =>
-    Object.values(csvFiles.value).some((entry) => entry.state === 'attached'),
-);
+        if (!section) {
+            return null;
+        }
+
+        return {
+            ...section,
+            questions: section.questions.filter((question) => currentStep.value.questionKeys?.includes(question.key) ?? true),
+        };
+    })
+    .filter((section) => section && section.questions.length));
+const currentStepQuestions = computed(() => currentStepSections.value.flatMap((section) => section.questions));
+const currentStepCsvDataTypes = computed(() => (currentStep.value.csvDataTypes ?? [])
+    .map((dataTypeKey) => CSV_DATA_TYPES.find((dataType) => dataType.key === dataTypeKey))
+    .filter(Boolean));
+
 const isCsvUploading = computed(() =>
     Object.values(csvFiles.value).some((entry) => entry.state === 'uploading'),
 );
@@ -83,6 +168,34 @@ const isCsvProcessing = computed(() =>
 const isCsvTerminal = computed(() =>
     csvImportStatus.value !== null && TERMINAL_IMPORT_STATUSES.includes(csvImportStatus.value),
 );
+const allCsvDataTypesProcessed = computed(() => CSV_DATA_TYPES.every((dataType) =>
+    csvFiles.value[dataType.key].state === 'processed',
+));
+const companyName = computed(() => answers.value['business.company_name'] || submitResult.value?.merchant?.company_name || null);
+const wizardTitle = computed(() => companyName.value
+    ? `Evaluate ${companyName.value}'s returns operation.`
+    : 'Evaluate your returns operation.');
+const missingRequiredStepQuestions = computed(() => currentStepQuestions.value.filter((question) => {
+    if (!question.required) {
+        return false;
+    }
+
+    return !isAnswered(answers.value[question.key]);
+}));
+const requiredStepQuestions = computed(() => currentStepQuestions.value.filter((question) => question.required));
+const isCurrentStepComplete = computed(() => missingRequiredStepQuestions.value.length === 0);
+const shouldShowWebsiteScan = computed(() => currentStep.value.websiteScan
+    && !(currentStep.value.hideWebsiteScanWhenComplete && requiredStepQuestions.value.length > 0 && isCurrentStepComplete.value));
+
+function initialAnswers() {
+    const seeded = {};
+
+    (props.initialAssessment?.answers ?? []).forEach((answer) => {
+        seeded[answer.question_key] = answer.value;
+    });
+
+    return seeded;
+}
 
 watchEffect(() => {
     props.catalog.forEach((section) => {
@@ -124,14 +237,31 @@ watch(answers, () => {
 
 watch(currentSectionIndex, () => {
     errors.value = {};
+
+    if (TERMINAL_IMPORT_STATUSES.includes(csvImportStatus.value)) {
+        csvImportStatus.value = null;
+        csvErrorsCount.value = 0;
+        csvActionError.value = null;
+    }
 });
 
-function questionError(index) {
-    const question = currentSection.value.questions[index];
+function questionError(question, index) {
     return errors.value[`answers.${index}.value`]?.[0]
         ?? errors.value[`answers.${index}.question_key`]?.[0]
         ?? errors.value[question.key]?.[0]
         ?? null;
+}
+
+function evidenceForQuestion(questionKey) {
+    return websiteEvidence.value[questionKey]?.[0] ?? null;
+}
+
+function isAnswered(value) {
+    return value !== null && value !== undefined && value !== '' && (!Array.isArray(value) || value.length > 0);
+}
+
+function updateManualPromptAfterAssistedFill() {
+    manualEntryOpen.value = missingRequiredStepQuestions.value.length > 0;
 }
 
 function missingSectionLabels() {
@@ -157,6 +287,7 @@ async function startAssessment() {
     if (!startPromise) {
         startPromise = axios.post('/api/assessments').then((response) => {
             assessmentId.value = response.data.assessment.id;
+            replaceResumeUrl(response.data.assessment.resume_url);
         }).catch((error) => {
             startPromise = null;
             throw error;
@@ -164,6 +295,14 @@ async function startAssessment() {
     }
 
     await startPromise;
+}
+
+function replaceResumeUrl(resumeUrl) {
+    if (!resumeUrl || typeof window === 'undefined') {
+        return;
+    }
+
+    window.history.replaceState(window.history.state, '', resumeUrl);
 }
 
 function queueSave() {
@@ -200,8 +339,8 @@ async function performSave(sectionIndex) {
     try {
         await startAssessment();
 
-        const section = props.catalog[sectionIndex];
-        const payload = section.questions.map((question) => ({
+        const step = ASSISTED_STEPS[sectionIndex];
+        const payload = stepQuestions(step).map((question) => ({
             question_key: question.key,
             value: answers.value[question.key] ?? (question.type === 'multiselect' ? [] : null),
         }));
@@ -224,6 +363,14 @@ async function performSave(sectionIndex) {
     }
 }
 
+function stepQuestions(step) {
+    return step.sectionKeys
+        .map((sectionKey) => props.catalog.find((section) => section.key === sectionKey))
+        .filter(Boolean)
+        .flatMap((section) => section.questions)
+        .filter((question) => step.questionKeys?.includes(question.key) ?? true);
+}
+
 async function flushPendingSave() {
     clearTimeout(debounceTimer);
 
@@ -239,6 +386,7 @@ async function flushPendingSave() {
 function selectSection(index) {
     flushSaveImmediately();
     currentSectionIndex.value = index;
+    manualEntryOpen.value = false;
 }
 
 function nextSection() {
@@ -246,12 +394,48 @@ function nextSection() {
 
     if (!isLastSection.value) {
         currentSectionIndex.value += 1;
+        manualEntryOpen.value = false;
     }
 }
 
 function previousSection() {
     flushSaveImmediately();
     currentSectionIndex.value = Math.max(0, currentSectionIndex.value - 1);
+    manualEntryOpen.value = false;
+}
+
+async function scanWebsite() {
+    websiteScanError.value = null;
+    websiteScanState.value = 'scanning';
+
+    try {
+        await startAssessment();
+
+        const response = await axios.post(`/api/assessments/${assessmentId.value}/website-scan`, {
+            url: websiteUrl.value,
+        });
+
+        websiteEvidence.value = response.data.evidence ?? {};
+        websiteUrl.value = response.data.merchant?.website ?? websiteUrl.value;
+
+        const responseAnswerKeys = new Set((response.data.answers ?? []).map((answer) => answer.question_key));
+        WEBSITE_SCAN_QUESTION_KEYS.forEach((questionKey) => {
+            if (!responseAnswerKeys.has(questionKey)) {
+                answers.value[questionKey] = null;
+            }
+        });
+
+        (response.data.answers ?? []).forEach((answer) => {
+            answers.value[answer.question_key] = answer.value;
+        });
+
+        websiteScanState.value = 'done';
+        updateManualPromptAfterAssistedFill();
+        status.value = 'Website scan applied where answers were blank.';
+    } catch (error) {
+        websiteScanState.value = 'error';
+        websiteScanError.value = error.response?.data?.message ?? 'We could not scan that site. Check the URL and try again.';
+    }
 }
 
 async function submitAssessment() {
@@ -294,11 +478,15 @@ function freshCsvFiles() {
     };
 }
 
-// Last section's primary action: bank any pending answer edits, then advance to
-// the import step. It deliberately does NOT submit — submission now happens from
-// within the import step.
-function goToImportStep() {
+async function continueFromLastStep() {
     flushSaveImmediately();
+
+    if (allCsvDataTypesProcessed.value) {
+        await submitAssessment();
+
+        return;
+    }
+
     currentPhase.value = 'import';
 }
 
@@ -313,26 +501,17 @@ function selectImportMode(mode) {
     importMode.value = mode;
 }
 
-async function ensureCsvImport() {
-    if (csvImportId.value) {
-        return;
-    }
+async function createCsvImport() {
+    await startAssessment();
 
-    if (!csvImportPromise) {
-        csvImportPromise = startAssessment().then(async () => {
-            // 'method' is server-derived for csv imports; we only send the provider.
-            const response = await axios.post(`/api/assessments/${assessmentId.value}/imports`, {
-                provider: 'csv',
-            });
+    // 'method' is server-derived for csv imports; we only send the provider.
+    const response = await axios.post(`/api/assessments/${assessmentId.value}/imports`, {
+        provider: 'csv',
+    });
 
-            csvImportId.value = response.data.data_import.id;
-        }).catch((error) => {
-            csvImportPromise = null;
-            throw error;
-        });
-    }
+    csvImportId.value = response.data.data_import.id;
 
-    await csvImportPromise;
+    return csvImportId.value;
 }
 
 async function onCsvFileSelected(dataType, event) {
@@ -346,20 +525,23 @@ async function onCsvFileSelected(dataType, event) {
     entry.filename = file.name;
     entry.error = null;
     entry.state = 'uploading';
+    csvActionError.value = null;
 
     try {
-        await ensureCsvImport();
+        const importId = await createCsvImport();
 
         const form = new FormData();
         form.append('data_type', dataType);
         form.append('file', file);
 
         await axios.post(
-            `/api/assessments/${assessmentId.value}/imports/${csvImportId.value}/files`,
+            `/api/assessments/${assessmentId.value}/imports/${importId}/files`,
             form,
         );
 
-        entry.state = 'attached';
+        entry.state = 'processing';
+        csvImportStatus.value = 'queued';
+        await processCsvImport(importId);
     } catch (error) {
         entry.state = 'error';
         entry.error = uploadErrorMessage(error);
@@ -379,7 +561,59 @@ function uploadErrorMessage(error) {
 
 function applyImportSnapshot(dataImport) {
     csvImportStatus.value = dataImport.status;
+    csvWarningsCount.value = dataImport.warnings_count ?? 0;
     csvErrorsCount.value = dataImport.errors_count ?? 0;
+}
+
+function csvIssueCount() {
+    return csvImportStatus.value === 'completed_with_warnings'
+        ? (csvWarningsCount.value || csvErrorsCount.value)
+        : csvErrorsCount.value;
+}
+
+function csvTerminalClass() {
+    return {
+        completed: 'rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-800',
+        completed_with_warnings: 'rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800',
+        failed: 'rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800',
+    }[csvImportStatus.value] ?? 'rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-700';
+}
+
+function csvTerminalMessage() {
+    if (csvImportStatus.value === 'completed') {
+        return 'Store data processed. Suggested answers were added where blanks existed.';
+    }
+
+    if (csvImportStatus.value === 'completed_with_warnings') {
+        return `Import finished, but ${csvIssueCount()} item(s) could not be used. The rest made it in and will be used in your estimate.`;
+    }
+
+    if (csvImportStatus.value === 'failed') {
+        return `Import failed (${csvIssueCount()} error(s)). None of the uploaded data could be used. You can try again or keep going without it.`;
+    }
+
+    return 'Import finished.';
+}
+
+function updateCsvFileStatesForTerminalImport() {
+    Object.values(csvFiles.value).forEach((entry) => {
+        if (entry.state !== 'processing') {
+            return;
+        }
+
+        if (csvImportStatus.value === 'completed' || csvImportStatus.value === 'completed_with_warnings') {
+            entry.state = 'processed';
+        } else if (csvImportStatus.value === 'failed') {
+            entry.state = 'error';
+            entry.error = `Import failed (${csvErrorsCount.value} error(s)). Please try a different CSV or continue without it.`;
+        }
+    });
+}
+
+function applyImportedAnswers(responseData) {
+    (responseData.answers ?? []).forEach((answer) => {
+        answers.value[answer.question_key] = answer.value;
+    });
 }
 
 function applyDemoImportSnapshot(dataImport) {
@@ -398,15 +632,20 @@ function applyDemoImportSnapshot(dataImport) {
     }
 }
 
-async function processCsvImport() {
+async function processCsvImport(importId = csvImportId.value) {
     csvActionError.value = null;
 
     try {
         const response = await axios.post(
-            `/api/assessments/${assessmentId.value}/imports/${csvImportId.value}/process`,
+            `/api/assessments/${assessmentId.value}/imports/${importId}/process`,
         );
 
         applyImportSnapshot(response.data.data_import);
+        applyImportedAnswers(response.data);
+        if (TERMINAL_IMPORT_STATUSES.includes(csvImportStatus.value)) {
+            updateCsvFileStatesForTerminalImport();
+            updateManualPromptAfterAssistedFill();
+        }
 
         // If the queue ran synchronously the import is already terminal; only
         // poll when it is still in flight.
@@ -415,6 +654,7 @@ async function processCsvImport() {
         }
     } catch (error) {
         csvActionError.value = 'We could not start the import. Please try again.';
+        throw error;
     }
 }
 
@@ -438,6 +678,10 @@ async function pollImport() {
             );
 
             applyDemoImportSnapshot(response.data.data_import);
+            applyImportedAnswers(response.data);
+            if (demoState.value === 'done') {
+                updateManualPromptAfterAssistedFill();
+            }
 
             return;
         }
@@ -447,8 +691,11 @@ async function pollImport() {
         );
 
         applyImportSnapshot(response.data.data_import);
+        applyImportedAnswers(response.data);
 
         if (TERMINAL_IMPORT_STATUSES.includes(csvImportStatus.value)) {
+            updateCsvFileStatesForTerminalImport();
+            updateManualPromptAfterAssistedFill();
             stopPolling();
         }
     } catch (error) {
@@ -465,9 +712,8 @@ async function cancelCsvImport() {
         // Cancel is best-effort; reset the UI regardless of the response.
     }
 
-    // A cancelled import is terminal on the backend (it cannot be re-processed
-    // or have more files attached), so returning to the pre-process state means
-    // starting a fresh import — the same recovery path as "Try again".
+    // A cancelled import is terminal on the backend, so recovery means starting
+    // a fresh one-file import on the next upload.
     resetCsvImport();
 }
 
@@ -475,8 +721,8 @@ function resetCsvImport() {
     stopPolling();
     csvFiles.value = freshCsvFiles();
     csvImportId.value = null;
-    csvImportPromise = null;
     csvImportStatus.value = null;
+    csvWarningsCount.value = 0;
     csvErrorsCount.value = 0;
     csvActionError.value = null;
 }
@@ -497,6 +743,10 @@ async function useDemoScenario(scenario) {
         });
 
         applyDemoImportSnapshot(response.data.data_import);
+        applyImportedAnswers(response.data);
+        if (demoState.value === 'done') {
+            updateManualPromptAfterAssistedFill();
+        }
     } catch (error) {
         stopPolling();
         demoState.value = 'error';
@@ -522,9 +772,9 @@ function importStatusLabel(status) {
                     <p class="mb-4 inline-flex rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700">
                         Merchant Readiness Assessment
                     </p>
-                    <h1 class="text-4xl font-bold tracking-tight sm:text-5xl">Evaluate your returns operation.</h1>
+                    <h1 class="text-4xl font-bold tracking-tight sm:text-5xl">{{ wizardTitle }}</h1>
                     <p class="mt-5 text-lg leading-8 text-slate-600">
-                        Complete each section, then submit to see your readiness score, breakdown, and recommendations. Your answers save automatically as you go.
+                        Scan your site, add lightweight store exports where useful, and only answer manually when evidence is missing or needs correction. Your answers save automatically as you go.
                     </p>
                 </div>
                 <Link href="/" class="inline-flex shrink-0 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50">
@@ -533,35 +783,140 @@ function importStatusLabel(status) {
             </div>
 
             <template v-if="currentPhase === 'questions'">
-                <div class="mb-8 grid gap-3 sm:grid-cols-6">
+                <div class="mb-8 grid gap-3 sm:grid-cols-4">
                     <button
-                        v-for="(section, index) in catalog"
-                        :key="section.key"
+                        v-for="(step, index) in ASSISTED_STEPS"
+                        :key="step.key"
                         type="button"
                         class="rounded-2xl border px-4 py-3 text-left text-sm transition"
                         :class="index === currentSectionIndex ? 'border-blue-400 bg-blue-50 text-blue-700' : 'border-slate-200 bg-white text-slate-600'"
                         :aria-current="index === currentSectionIndex ? 'step' : undefined"
                         @click="selectSection(index)"
                     >
-                        {{ section.label }}
+                        <span class="block text-xs font-semibold uppercase tracking-wide text-slate-400">{{ step.eyebrow }}</span>
+                        {{ step.label }}
                     </button>
                 </div>
 
                 <form class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm" @submit.prevent="nextSection">
                     <div class="mb-6 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
                         <div>
-                            <p class="text-sm font-medium text-blue-600">Section {{ currentSectionIndex + 1 }} of {{ catalog.length }}</p>
-                            <h2 class="mt-1 text-2xl font-semibold">{{ currentSection.label }}</h2>
+                            <p class="text-sm font-medium text-blue-600">Step {{ currentSectionIndex + 1 }} of {{ assistedStepCount }}</p>
+                            <h2 class="mt-1 text-2xl font-semibold">{{ currentStep.title }}</h2>
+                            <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">{{ currentStep.description }}</p>
                         </div>
                         <p class="text-sm text-slate-500" role="status" aria-live="polite">{{ status }}</p>
                     </div>
 
-                    <div class="space-y-6">
-                        <label v-for="(question, questionIndex) in currentSection.questions" :key="question.key" class="block">
+                    <div v-if="shouldShowWebsiteScan" class="mb-6 rounded-2xl border border-blue-100 bg-blue-50 p-5">
+                        <div class="flex flex-col gap-4 lg:flex-row lg:items-end">
+                            <label class="flex-1">
+                                <span class="block text-sm font-semibold text-slate-900">{{ currentStep.websiteScanLabel }}</span>
+                                <span class="mt-1 block text-sm text-slate-600">{{ currentStep.websiteScanHelp }}</span>
+                                <input
+                                    v-model="websiteUrl"
+                                    type="url"
+                                    :placeholder="currentStep.websiteScanPlaceholder"
+                                    class="mt-3 w-full rounded-xl border border-blue-200 bg-white px-4 py-3 text-slate-900 outline-none ring-blue-500 transition focus:ring-2"
+                                >
+                            </label>
+                            <button
+                                type="button"
+                                data-testid="scan-website"
+                                class="rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-200 transition hover:bg-blue-700 disabled:opacity-50"
+                                :disabled="websiteScanState === 'scanning' || !websiteUrl"
+                                :aria-busy="websiteScanState === 'scanning'"
+                                @click="scanWebsite"
+                            >
+                                {{ websiteScanState === 'scanning' ? 'Scanning...' : currentStep.websiteScanButton }}
+                            </button>
+                        </div>
+                        <p v-if="websiteScanError" class="mt-3 text-sm text-red-600" role="alert">{{ websiteScanError }}</p>
+                        <p v-else-if="websiteScanState === 'done'" class="mt-3 text-sm font-medium text-blue-800">Scan complete. Suggested answers were added only where blanks existed.</p>
+                    </div>
+
+                    <div v-if="currentStepCsvDataTypes.length" class="mb-6 rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                        <h3 class="text-sm font-semibold text-slate-900">Optional CSV evidence</h3>
+                        <p class="mt-1 text-sm text-slate-600">For best results, upload a full year when available. A quarter is useful, and one month can still improve directional estimates.</p>
+
+                        <div class="mt-4 grid gap-3 sm:grid-cols-2">
+                            <div
+                                v-for="dataType in currentStepCsvDataTypes"
+                                :key="dataType.key"
+                                class="rounded-xl border border-slate-200 bg-white p-4"
+                            >
+                                <p class="text-sm font-semibold text-slate-900">{{ dataType.label }}</p>
+                                <p class="mt-1 text-xs text-slate-500">{{ dataType.hint }}</p>
+                                <p class="mt-1 text-xs text-slate-500">Recommended range: year. Accepted: month, quarter, or year.</p>
+
+                                <label class="mt-3 inline-flex cursor-pointer items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50">
+                                    Choose file
+                                    <input
+                                        type="file"
+                                        accept=".csv"
+                                        class="sr-only"
+                                        :data-testid="`csv-input-${dataType.key}`"
+                                        :disabled="isCsvProcessing || isCsvUploading"
+                                        @change="onCsvFileSelected(dataType.key, $event)"
+                                    >
+                                </label>
+
+                                <p
+                                    v-if="csvFiles[dataType.key].state !== 'idle'"
+                                    class="mt-2 text-xs"
+                                    :class="csvFiles[dataType.key].state === 'error' ? 'text-red-600' : 'text-slate-600'"
+                                    :data-testid="`csv-state-${dataType.key}`"
+                                >
+                                    <template v-if="csvFiles[dataType.key].state === 'uploading'">Uploading {{ csvFiles[dataType.key].filename }}...</template>
+                                    <template v-else-if="csvFiles[dataType.key].state === 'processing'">Processing {{ csvFiles[dataType.key].filename }}...</template>
+                                    <template v-else-if="csvFiles[dataType.key].state === 'processed'">Processed: {{ csvFiles[dataType.key].filename }}</template>
+                                    <template v-else-if="csvFiles[dataType.key].state === 'error'">{{ csvFiles[dataType.key].error }}</template>
+                                </p>
+                            </div>
+                        </div>
+
+                        <p v-if="csvActionError" class="mt-4 text-sm text-red-600" role="alert">{{ csvActionError }}</p>
+
+                        <div v-if="isCsvProcessing" class="mt-5 flex flex-wrap items-center gap-3" data-testid="csv-progress">
+                            <span class="text-sm font-medium text-slate-700">{{ importStatusLabel(csvImportStatus) }}</span>
+                            <button
+                                type="button"
+                                data-testid="cancel-import"
+                                class="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-white"
+                                @click="cancelCsvImport"
+                            >
+                                Cancel
+                            </button>
+                        </div>
+
+                        <div v-else-if="isCsvTerminal" class="mt-5" data-testid="csv-result">
+                            <div :class="csvTerminalClass()">{{ csvTerminalMessage() }}</div>
+                        </div>
+                    </div>
+
+                    <button
+                        type="button"
+                        class="mb-4 inline-flex items-center rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                        :aria-expanded="manualEntryOpen"
+                        @click="manualEntryOpen = !manualEntryOpen"
+                    >
+                        {{ manualEntryOpen ? 'Hide manual answers' : 'Review or edit manual answers' }}
+                    </button>
+
+                    <div v-if="manualEntryOpen" class="space-y-8">
+                        <section v-for="section in currentStepSections" :key="section.key" class="rounded-2xl border border-slate-200 p-5">
+                            <h3 class="text-base font-semibold text-slate-900">{{ section.label }}</h3>
+                            <div class="mt-5 space-y-6">
+                        <label v-for="(question, questionIndex) in section.questions" :key="question.key" class="block">
                             <span class="mb-2 block text-sm font-medium text-slate-900">
                                 {{ question.label }}
                                 <span v-if="question.required" class="text-blue-600">*</span>
                             </span>
+
+                            <p v-if="evidenceForQuestion(question.key)" class="mb-2 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-800">
+                                Suggested from {{ evidenceForQuestion(question.key).source_label }}: {{ evidenceForQuestion(question.key).value }}
+                                <span v-if="evidenceForQuestion(question.key).evidence_snippet" class="mt-1 block text-blue-700">"{{ evidenceForQuestion(question.key).evidence_snippet }}"</span>
+                            </p>
 
                             <input
                                 v-if="['text', 'email'].includes(question.type)"
@@ -599,10 +954,12 @@ function importStatusLabel(status) {
                                 <option :value="false">No</option>
                             </select>
 
-                            <p v-if="questionError(questionIndex)" class="mt-2 text-sm text-red-600">
-                                {{ questionError(questionIndex) }}
+                            <p v-if="questionError(question, currentStepQuestions.findIndex((stepQuestion) => stepQuestion.key === question.key))" class="mt-2 text-sm text-red-600">
+                                {{ questionError(question, currentStepQuestions.findIndex((stepQuestion) => stepQuestion.key === question.key)) }}
                             </p>
                         </label>
+                            </div>
+                        </section>
                     </div>
 
                     <div class="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-between">
@@ -617,7 +974,9 @@ function importStatusLabel(status) {
                         <button
                             v-if="!isLastSection"
                             type="submit"
-                            class="rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-200 transition hover:bg-blue-700"
+                            data-testid="next-step"
+                            class="rounded-xl px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-700"
+                            :class="isCurrentStepComplete ? 'bg-blue-600 shadow-xl shadow-blue-300 ring-4 ring-blue-100' : 'bg-blue-500 shadow-lg shadow-blue-200'"
                         >
                             Next
                         </button>
@@ -629,9 +988,9 @@ function importStatusLabel(status) {
                         type="button"
                         data-testid="continue-to-import"
                         class="rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-200 transition hover:bg-blue-700"
-                        @click="goToImportStep"
+                        @click="continueFromLastStep"
                     >
-                        Continue
+                        {{ isSubmitting ? 'Submitting...' : 'Continue' }}
                     </button>
                 </div>
 
@@ -769,7 +1128,8 @@ function importStatusLabel(status) {
                                     :data-testid="`csv-state-${dataType.key}`"
                                 >
                                     <template v-if="csvFiles[dataType.key].state === 'uploading'">Uploading {{ csvFiles[dataType.key].filename }}…</template>
-                                    <template v-else-if="csvFiles[dataType.key].state === 'attached'">Attached: {{ csvFiles[dataType.key].filename }}</template>
+                                    <template v-else-if="csvFiles[dataType.key].state === 'processing'">Processing {{ csvFiles[dataType.key].filename }}…</template>
+                                    <template v-else-if="csvFiles[dataType.key].state === 'processed'">Processed: {{ csvFiles[dataType.key].filename }}</template>
                                     <template v-else-if="csvFiles[dataType.key].state === 'error'">{{ csvFiles[dataType.key].error }}</template>
                                 </p>
                             </div>
@@ -777,21 +1137,8 @@ function importStatusLabel(status) {
 
                         <p v-if="csvActionError" class="mt-4 text-sm text-red-600" role="alert">{{ csvActionError }}</p>
 
-                        <!-- Pre-process actions -->
-                        <div v-if="!isCsvProcessing && !isCsvTerminal" class="mt-5 flex flex-wrap items-center gap-3">
-                            <button
-                                type="button"
-                                data-testid="process-import"
-                                class="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-200 transition hover:bg-blue-700 disabled:opacity-40"
-                                :disabled="!hasAttachedCsvFile || isCsvUploading"
-                                @click="processCsvImport"
-                            >
-                                Process import
-                            </button>
-                        </div>
-
                         <!-- In-flight -->
-                        <div v-else-if="isCsvProcessing" class="mt-5 flex flex-wrap items-center gap-3" data-testid="csv-progress">
+                        <div v-if="isCsvProcessing" class="mt-5 flex flex-wrap items-center gap-3" data-testid="csv-progress">
                             <span class="text-sm font-medium text-slate-700">{{ importStatusLabel(csvImportStatus) }}</span>
                             <button
                                 type="button"
@@ -805,15 +1152,7 @@ function importStatusLabel(status) {
 
                         <!-- Terminal outcomes -->
                         <div v-else-if="isCsvTerminal" class="mt-5" data-testid="csv-result">
-                            <div v-if="csvImportStatus === 'completed'" class="rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-800">
-                                Your store data is in. The estimate will use these signals.
-                            </div>
-                            <div v-else-if="csvImportStatus === 'completed_with_warnings'" class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-                                Import finished, but {{ csvErrorsCount }} item(s) could not be used. The rest made it in and will be used in your estimate.
-                            </div>
-                            <div v-else-if="csvImportStatus === 'failed'" class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
-                                Import failed ({{ csvErrorsCount }} error(s)). None of the uploaded data could be used. You can try again or keep going without it.
-                            </div>
+                            <div :class="csvTerminalClass()">{{ csvTerminalMessage() }}</div>
 
                             <div class="mt-4 flex flex-wrap items-center gap-3">
                                 <button

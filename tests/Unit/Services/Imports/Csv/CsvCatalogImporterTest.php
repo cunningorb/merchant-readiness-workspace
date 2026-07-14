@@ -94,6 +94,41 @@ class CsvCatalogImporterTest extends TestCase
         $this->assertSame(0, $file->fresh()->rejected_count);
     }
 
+    public function test_utf8_bom_on_header_does_not_break_column_mapping(): void
+    {
+        $csv = "\xEF\xBB\xBF".<<<'CSV'
+title,product_type,vendor,tags,description_length,status,variant_count,has_size_option,has_color_option,media_count,price,compare_at_price,sku,inventory_tracked
+Classic Tee,Apparel,Acme,"sale;new",120,active,4,true,true,5,19.99,24.99,TEE-001,true
+CSV;
+
+        [$dataImport, $file] = $this->importWithFile($csv);
+
+        (new CsvCatalogImporter)->importCatalog($dataImport);
+
+        $this->assertDatabaseHas('merchant_products', [
+            'source_import_id' => $dataImport->id,
+            'title' => 'Classic Tee',
+        ]);
+        $this->assertSame(1, $file->fresh()->accepted_count);
+        $this->assertSame(0, $file->fresh()->rejected_count);
+    }
+
+    public function test_importing_same_catalog_again_replaces_rows_for_the_import(): void
+    {
+        $csv = <<<'CSV'
+        title,product_type,vendor,tags,description_length,status,variant_count,has_size_option,has_color_option,media_count,price,compare_at_price,sku,inventory_tracked
+        Classic Tee,Apparel,Acme,"sale;new",120,active,4,true,true,5,19.99,24.99,TEE-001,true
+        CSV;
+
+        [$dataImport] = $this->importWithFile($csv);
+        $importer = new CsvCatalogImporter;
+
+        $importer->importCatalog($dataImport);
+        $importer->importCatalog($dataImport);
+
+        $this->assertSame(1, MerchantProduct::query()->where('source_import_id', $dataImport->id)->count());
+    }
+
     public function test_a_row_missing_title_is_generated_a_fallback_provider_product_id_when_sku_is_also_blank(): void
     {
         $csv = <<<'CSV'

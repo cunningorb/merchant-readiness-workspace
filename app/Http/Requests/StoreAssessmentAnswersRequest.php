@@ -16,10 +16,32 @@ class StoreAssessmentAnswersRequest extends FormRequest
     public function rules(AssessmentQuestionCatalog $catalog): array
     {
         return [
-            'answers' => ['required', 'array', 'min:1'],
+            'answers' => ['required', 'array'],
             'answers.*.question_key' => ['required', 'string', Rule::in($catalog->questions()->pluck('key')->all())],
             'answers.*.value' => ['present'],
         ];
+    }
+
+    public function draftAnswers(): array
+    {
+        $catalog = app(AssessmentQuestionCatalog::class);
+
+        return collect($this->validated('answers'))
+            ->filter(function (mixed $answer) use ($catalog): bool {
+                if (! is_array($answer)) {
+                    return true;
+                }
+
+                $question = isset($answer['question_key']) ? $catalog->question($answer['question_key']) : null;
+
+                if ($question === null || ! array_key_exists('value', $answer)) {
+                    return true;
+                }
+
+                return ! $this->isBlankDraftValue($answer['value']);
+            })
+            ->values()
+            ->all();
     }
 
     public function withValidator($validator): void
@@ -35,6 +57,10 @@ class StoreAssessmentAnswersRequest extends FormRequest
                 }
 
                 $value = $answer['value'];
+
+                if ($this->isBlankDraftValue($value)) {
+                    continue;
+                }
 
                 if (($question['required'] ?? false) && ($value === null || $value === '' || $value === [])) {
                     $validator->errors()->add("answers.$index.value", 'This question is required.');
@@ -100,5 +126,10 @@ class StoreAssessmentAnswersRequest extends FormRequest
         if (! is_bool($value)) {
             $validator->errors()->add("answers.$index.value", 'This answer must be true or false.');
         }
+    }
+
+    private function isBlankDraftValue(mixed $value): bool
+    {
+        return $value === null || $value === '' || $value === [];
     }
 }

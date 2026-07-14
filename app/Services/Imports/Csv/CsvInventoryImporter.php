@@ -10,6 +10,7 @@ use App\Services\Imports\Csv\Concerns\LocatesDataImportFile;
 use App\Services\Imports\Csv\Concerns\ParsesCsvValues;
 use App\Services\Imports\Csv\Concerns\ReadsCsvRows;
 use App\Services\Imports\ImportCoordinator;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use RuntimeException;
 
@@ -61,25 +62,30 @@ class CsvInventoryImporter implements InventoryImporter
 
         $assessment = $dataImport->assessment;
 
-        MerchantInventoryMetric::create([
-            'merchant_id' => $assessment->merchant_id,
-            'assessment_id' => $assessment->id,
-            'source_provider' => 'csv',
-            'source_import_id' => $dataImport->id,
-            'percent_multi_location_stock' => $percentMultiLocationStock,
-            'percent_low_or_zero_stock' => $percentLowOrZeroStock,
-            'sku_completeness' => $skuCompleteness,
-            'exchange_availability_risk' => $exchangeAvailabilityRisk,
-        ]);
+        DB::transaction(function () use ($dataImport, $assessment, $percentMultiLocationStock, $percentLowOrZeroStock, $skuCompleteness, $exchangeAvailabilityRisk, $activeLocationCount, $operationalComplexityScore): void {
+            MerchantInventoryMetric::query()->where('source_import_id', $dataImport->id)->delete();
+            MerchantLocationMetric::query()->where('source_import_id', $dataImport->id)->delete();
 
-        MerchantLocationMetric::create([
-            'merchant_id' => $assessment->merchant_id,
-            'assessment_id' => $assessment->id,
-            'source_provider' => 'csv',
-            'source_import_id' => $dataImport->id,
-            'active_location_count' => $activeLocationCount,
-            'operational_complexity_score' => $operationalComplexityScore,
-        ]);
+            MerchantInventoryMetric::create([
+                'merchant_id' => $assessment->merchant_id,
+                'assessment_id' => $assessment->id,
+                'source_provider' => 'csv',
+                'source_import_id' => $dataImport->id,
+                'percent_multi_location_stock' => $percentMultiLocationStock,
+                'percent_low_or_zero_stock' => $percentLowOrZeroStock,
+                'sku_completeness' => $skuCompleteness,
+                'exchange_availability_risk' => $exchangeAvailabilityRisk,
+            ]);
+
+            MerchantLocationMetric::create([
+                'merchant_id' => $assessment->merchant_id,
+                'assessment_id' => $assessment->id,
+                'source_provider' => 'csv',
+                'source_import_id' => $dataImport->id,
+                'active_location_count' => $activeLocationCount,
+                'operational_complexity_score' => $operationalComplexityScore,
+            ]);
+        });
 
         $file->update(['row_count' => 1, 'accepted_count' => 1, 'rejected_count' => 0]);
     }

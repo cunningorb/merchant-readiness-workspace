@@ -12,13 +12,14 @@ class OpportunityRankingServiceTest extends TestCase
 {
     use RefreshDatabase;
 
-    private function opportunity(string $type, float $min, float $max, string $confidence = 'medium'): AssessmentOpportunity
+    private function opportunity(string $type, float $min, float $max, string $confidence = 'medium', ?int $sortOrder = null): AssessmentOpportunity
     {
         return AssessmentOpportunity::factory()->make([
             'type' => $type,
             'minimum_value' => $min,
             'maximum_value' => $max,
             'confidence' => $confidence,
+            'sort_order' => $sortOrder,
         ]);
     }
 
@@ -88,21 +89,48 @@ class OpportunityRankingServiceTest extends TestCase
         );
     }
 
-    public function test_unmapped_category_ranks_after_mapped_categories(): void
+    public function test_ranks_recommendations_by_persisted_opportunity_sort_order_when_available(): void
     {
         $opportunities = [
-            $this->opportunity(AssessmentOpportunity::TYPE_SUPPORT_CONTACT_REDUCTION, 10, 20),
+            $this->opportunity(AssessmentOpportunity::TYPE_RETAINED_REVENUE, 1000, 2000, sortOrder: 2),
+            $this->opportunity(AssessmentOpportunity::TYPE_MANUAL_WORK_SAVINGS, 5, 10, sortOrder: 0),
+            $this->opportunity(AssessmentOpportunity::TYPE_SUPPORT_CONTACT_REDUCTION, 10, 20, sortOrder: 1),
         ];
 
-        $platformRec = $this->recommendation('platform', 'high', 'Adopt returns app');
+        $manualOpsRec = $this->recommendation('manual_operations', 'low', 'Automate approvals');
+        $exchangesRec = $this->recommendation('exchanges', 'low', 'Offer exchanges');
         $policyRec = $this->recommendation('return_policy', 'low', 'Clarify policy');
 
         $ranked = (new OpportunityRankingService)->rankRecommendations(
-            collect([$platformRec, $policyRec]),
+            collect([$exchangesRec, $policyRec, $manualOpsRec]),
             $opportunities,
         );
 
-        $this->assertSame(['Clarify policy', 'Adopt returns app'], $ranked->pluck('title')->all());
+        $this->assertSame(
+            ['Automate approvals', 'Clarify policy', 'Offer exchanges'],
+            $ranked->pluck('title')->all(),
+        );
+    }
+
+    public function test_platform_recommendations_map_to_manual_work_opportunity_and_respect_priority(): void
+    {
+        $opportunities = [
+            $this->opportunity(AssessmentOpportunity::TYPE_MANUAL_WORK_SAVINGS, 10, 20),
+        ];
+
+        $platformRec = $this->recommendation('platform', 'high', 'Adopt returns app');
+        $manualRec = $this->recommendation('manual_operations', 'low', 'Document return workflow');
+        $policyRec = $this->recommendation('return_policy', 'low', 'Clarify policy');
+
+        $ranked = (new OpportunityRankingService)->rankRecommendations(
+            collect([$manualRec, $policyRec, $platformRec]),
+            $opportunities,
+        );
+
+        $this->assertSame(
+            ['Adopt returns app', 'Document return workflow', 'Clarify policy'],
+            $ranked->pluck('title')->all(),
+        );
     }
 
     public function test_recommendation_still_ranked_by_type_when_linked_opportunity_missing_from_array(): void

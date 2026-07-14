@@ -67,7 +67,14 @@ class OpportunityRankingService
 
         return $recommendations
             ->sort(function (Recommendation $a, Recommendation $b) use ($categoryMap, $opportunityByType) {
-                $typeComparison = $this->recommendationTypeRank($a, $categoryMap) <=> $this->recommendationTypeRank($b, $categoryMap);
+                $priorityComparison = $this->priorityRank($a) <=> $this->priorityRank($b);
+
+                if ($priorityComparison !== 0) {
+                    return $priorityComparison;
+                }
+
+                $typeComparison = $this->recommendationTypeRank($a, $categoryMap, $opportunityByType)
+                    <=> $this->recommendationTypeRank($b, $categoryMap, $opportunityByType);
 
                 if ($typeComparison !== 0) {
                     return $typeComparison;
@@ -78,12 +85,6 @@ class OpportunityRankingService
 
                 if ($confidenceComparison !== 0) {
                     return $confidenceComparison;
-                }
-
-                $priorityComparison = $this->priorityRank($a) <=> $this->priorityRank($b);
-
-                if ($priorityComparison !== 0) {
-                    return $priorityComparison;
                 }
 
                 return strcmp($a->title, $b->title);
@@ -104,11 +105,17 @@ class OpportunityRankingService
     /**
      * @param  array<string, string>  $categoryMap
      */
-    private function recommendationTypeRank(Recommendation $recommendation, array $categoryMap): int
+    private function recommendationTypeRank(Recommendation $recommendation, array $categoryMap, Collection $opportunityByType): int
     {
         $type = $categoryMap[$recommendation->category] ?? null;
 
-        return $type === null ? count(self::TYPE_ORDER) : $this->typeRank($type);
+        if ($type === null) {
+            return count(self::TYPE_ORDER);
+        }
+
+        $opportunity = $opportunityByType->get($type);
+
+        return $opportunity?->sort_order ?? $this->typeRank($type);
     }
 
     /**

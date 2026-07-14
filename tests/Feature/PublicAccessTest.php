@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Models\Merchant;
+use Database\Seeders\DemoMerchantsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -15,6 +17,20 @@ class PublicAccessTest extends TestCase
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page->component('Welcome'));
+    }
+
+    public function test_sample_report_redirects_to_middle_tier_demo_report(): void
+    {
+        $this->seed(DemoMerchantsSeeder::class);
+
+        $report = Merchant::where('company_name', 'Northline Outdoor Supply')
+            ->firstOrFail()
+            ->assessments()
+            ->firstOrFail()
+            ->report;
+
+        $this->get('/sample-report')
+            ->assertRedirect(route('reports.show', $report->token));
     }
 
     public function test_privacy_page_is_reachable_without_authentication(): void

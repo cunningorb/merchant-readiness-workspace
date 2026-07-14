@@ -20,6 +20,9 @@ import PublicLayout from '@/Layouts/PublicLayout.vue';
                     <Link href="/assessment" class="rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-200 transition hover:bg-blue-700">
                         Start assessment
                     </Link>
+                    <Link href="/sample-report" class="rounded-xl border border-blue-200 bg-white px-5 py-3 text-sm font-semibold text-blue-700 shadow-sm transition hover:bg-blue-50">
+                        View sample report
+                    </Link>
                 </div>
                 <p class="mt-4 text-sm text-slate-500">
                     No account needed. Optional imports use store-level signals, not customer PII.

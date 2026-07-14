@@ -355,15 +355,19 @@ class ReportBuilderServiceTest extends TestCase
         $this->assertCount(3, $payload['topRecommendations']);
         $this->assertCount(1, $payload['remainingRecommendations']);
         $this->assertSame(
-            ['Exchanges rec', 'Manual ops rec', 'Policy rec'],
+            ['Exchanges rec', 'Manual ops rec', 'Platform rec'],
             array_column($payload['topRecommendations'], 'title')
         );
-        $this->assertSame(['Platform rec'], array_column($payload['remainingRecommendations'], 'title'));
+        $this->assertSame(['Policy rec'], array_column($payload['remainingRecommendations'], 'title'));
         $this->assertSame('retained_revenue', $payload['topRecommendations'][0]['opportunity_type']);
-        $this->assertNull($payload['remainingRecommendations'][0]['opportunity_type']);
+        $this->assertSame('manual_work_savings', $payload['topRecommendations'][2]['opportunity_type']);
+        $this->assertSame('support_contact_reduction', $payload['remainingRecommendations'][0]['opportunity_type']);
 
-        // legacy key is unaffected
         $this->assertCount(4, $payload['recommendations']);
+        $this->assertSame(
+            ['Exchanges rec', 'Manual ops rec', 'Platform rec', 'Policy rec'],
+            array_column($payload['recommendations'], 'title')
+        );
         $this->assertArrayNotHasKey('opportunity_type', $payload['recommendations'][0]);
     }
 
@@ -447,8 +451,8 @@ class ReportBuilderServiceTest extends TestCase
         $payload = $service->buildPayload($report);
 
         $this->assertCount(3, $payload['actionPlan']['this_week']);
-        $this->assertSame(['A', 'B', 'C'], $payload['actionPlan']['this_week']);
-        $this->assertSame(['D'], $payload['actionPlan']['plan_next']);
+        $this->assertSame(['A', 'B', 'D'], $payload['actionPlan']['this_week']);
+        $this->assertSame(['C'], $payload['actionPlan']['plan_next']);
     }
 
     public function test_build_payload_action_plan_is_empty_when_no_recommendations(): void

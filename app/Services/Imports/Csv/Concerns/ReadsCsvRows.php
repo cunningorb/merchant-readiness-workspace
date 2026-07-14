@@ -32,6 +32,7 @@ trait ReadsCsvRows
             return [];
         }
 
+        $header[0] = preg_replace('/^\xEF\xBB\xBF/', '', $header[0]);
         $columnCount = count($header);
         $rows = [];
 

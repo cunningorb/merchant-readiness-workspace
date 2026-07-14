@@ -107,16 +107,17 @@ afterEach(() => {
 });
 
 describe('Workspace/Show', () => {
-    it('leads with the quantified revenue opportunity before the diagnostic breakdown', () => {
+    it('leads with the quantified revenue opportunity without the legacy diagnostic breakdown', () => {
         const wrapper = mountShow();
         const html = wrapper.html();
 
         const heroIndex = html.indexOf('data-testid="opportunity-hero"');
-        const diagnosticIndex = html.indexOf('Full diagnostic breakdown');
 
         expect(heroIndex).toBeGreaterThan(-1);
-        expect(diagnosticIndex).toBeGreaterThan(heroIndex);
+        expect(html).not.toContain('Full diagnostic breakdown');
         expect(wrapper.text()).toContain('Your company could get back $105,000–$210,000 in revenue this year');
+        expect(wrapper.text()).not.toContain('Score breakdown');
+        expect(wrapper.text()).not.toContain('Capability mapping');
     });
 
     it('keeps talking points visible for internal follow-up', () => {

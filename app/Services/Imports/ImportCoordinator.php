@@ -229,7 +229,7 @@ class ImportCoordinator
         DB::transaction(function () use ($dataImportId, $dataType, $failed) {
             $import = DataImport::query()->lockForUpdate()->find($dataImportId);
 
-            if ($import === null || $import->status === ImportStatus::Cancelled->value) {
+            if ($import === null || $this->isTerminal($import->status)) {
                 return;
             }
 
@@ -245,6 +245,9 @@ class ImportCoordinator
 
             if ($pending === []) {
                 $import->status = $this->overallStatus($import);
+                $import->warnings_count = $import->status === ImportStatus::CompletedWithWarnings->value
+                    ? $import->errors_count
+                    : 0;
                 $import->completed_at = now();
             }
 
@@ -286,6 +289,16 @@ class ImportCoordinator
         }
 
         return ImportStatus::CompletedWithWarnings->value;
+    }
+
+    private function isTerminal(string $status): bool
+    {
+        return in_array($status, [
+            ImportStatus::Completed->value,
+            ImportStatus::CompletedWithWarnings->value,
+            ImportStatus::Failed->value,
+            ImportStatus::Cancelled->value,
+        ], true);
     }
 
     /**

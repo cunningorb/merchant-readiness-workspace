@@ -21,9 +21,16 @@ class WorkspaceTest extends TestCase
         $response->assertRedirect('/login');
     }
 
+    public function test_staff_users_are_forbidden_from_the_internal_workspace(): void
+    {
+        $user = User::factory()->staff()->create();
+
+        $this->actingAs($user)->get('/dashboard')->assertForbidden();
+    }
+
     public function test_lists_only_submitted_assessments(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->admin()->create();
         $submitted = Assessment::factory()->create([
             'status' => 'submitted',
             'submitted_at' => now(),
@@ -44,7 +51,7 @@ class WorkspaceTest extends TestCase
 
     public function test_search_filters_by_company_name(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->admin()->create();
         $match = Merchant::factory()->create(['company_name' => 'Acme Corp']);
         $other = Merchant::factory()->create(['company_name' => 'Globex Inc']);
         Assessment::factory()->for($match)->create(['status' => 'submitted', 'submitted_at' => now()]);
@@ -60,7 +67,7 @@ class WorkspaceTest extends TestCase
 
     public function test_search_filters_by_contact_name(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->admin()->create();
         $match = Merchant::factory()->create(['contact_name' => 'Jane Doe']);
         Assessment::factory()->for($match)->create(['status' => 'submitted', 'submitted_at' => now()]);
         $other = Merchant::factory()->create(['contact_name' => 'Raj Patel']);
@@ -76,7 +83,7 @@ class WorkspaceTest extends TestCase
 
     public function test_sorts_by_submitted_date(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->admin()->create();
         $older = Assessment::factory()->create(['status' => 'submitted', 'submitted_at' => now()->subDays(5)]);
         $newer = Assessment::factory()->create(['status' => 'submitted', 'submitted_at' => now()]);
 
@@ -90,7 +97,7 @@ class WorkspaceTest extends TestCase
 
     public function test_sorts_by_tier_score(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->admin()->create();
         $low = Assessment::factory()->create(['status' => 'submitted', 'submitted_at' => now(), 'overall_score' => 20, 'overall_tier' => 'Foundational']);
         $high = Assessment::factory()->create(['status' => 'submitted', 'submitted_at' => now(), 'overall_score' => 90, 'overall_tier' => 'Advanced']);
 
@@ -104,7 +111,7 @@ class WorkspaceTest extends TestCase
 
     public function test_sorts_by_company_name(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->admin()->create();
         $zCorp = Merchant::factory()->create(['company_name' => 'Zeta Corp']);
         $aCorp = Merchant::factory()->create(['company_name' => 'Acme Corp']);
         $z = Assessment::factory()->for($zCorp)->create(['status' => 'submitted', 'submitted_at' => now()]);
@@ -120,7 +127,7 @@ class WorkspaceTest extends TestCase
 
     public function test_shows_assessment_review_with_merchant_and_talking_points(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->admin()->create();
         $merchant = Merchant::factory()->create([
             'company_name' => 'Acme Corp',
             'contact_name' => 'Jane Doe',
@@ -136,10 +143,10 @@ class WorkspaceTest extends TestCase
         ]);
         Report::factory()->for($assessment)->create(['published_at' => now()]);
 
-        Recommendation::factory()->for($assessment)->create(['priority' => 'low', 'title' => 'Low priority item']);
-        Recommendation::factory()->for($assessment)->create(['priority' => 'high', 'title' => 'High priority item']);
-        Recommendation::factory()->for($assessment)->create(['priority' => 'medium', 'title' => 'Medium priority item']);
-        Recommendation::factory()->for($assessment)->create(['priority' => 'high', 'title' => 'Second high priority item']);
+        Recommendation::factory()->for($assessment)->create(['category' => 'platform', 'priority' => 'low', 'title' => 'Low priority item']);
+        Recommendation::factory()->for($assessment)->create(['category' => 'platform', 'priority' => 'high', 'title' => 'High priority item']);
+        Recommendation::factory()->for($assessment)->create(['category' => 'platform', 'priority' => 'medium', 'title' => 'Medium priority item']);
+        Recommendation::factory()->for($assessment)->create(['category' => 'platform', 'priority' => 'high', 'title' => 'Second high priority item']);
 
         $response = $this->actingAs($user)->get("/dashboard/assessments/{$assessment->id}");
 
@@ -161,7 +168,7 @@ class WorkspaceTest extends TestCase
 
     public function test_show_404s_for_unknown_assessment(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->admin()->create();
 
         $response = $this->actingAs($user)->get('/dashboard/assessments/does-not-exist');
 
@@ -170,7 +177,7 @@ class WorkspaceTest extends TestCase
 
     public function test_show_404s_for_draft_assessment(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->admin()->create();
         $assessment = Assessment::factory()->create(['status' => 'draft']);
 
         $response = $this->actingAs($user)->get("/dashboard/assessments/{$assessment->id}");
@@ -191,7 +198,7 @@ class WorkspaceTest extends TestCase
 
     public function test_show_includes_opportunity_first_payload_keys(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->admin()->create();
         $assessment = Assessment::factory()->create([
             'status' => 'submitted',
             'submitted_at' => now(),
@@ -218,7 +225,7 @@ class WorkspaceTest extends TestCase
 
     public function test_show_includes_peer_comparisons_key(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->admin()->create();
         $assessment = Assessment::factory()->create([
             'status' => 'submitted',
             'submitted_at' => now(),
@@ -240,7 +247,7 @@ class WorkspaceTest extends TestCase
 
     public function test_show_creates_missing_report_for_submitted_assessment_without_one(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->admin()->create();
         $assessment = Assessment::factory()->create([
             'status' => 'submitted',
             'submitted_at' => now(),

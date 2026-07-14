@@ -85,7 +85,7 @@ Recommended Render environment variables:
 
 - `SESSION_DRIVER=database`
 - `CACHE_STORE=database`
-- `QUEUE_CONNECTION=database`
+- `QUEUE_CONNECTION=sync`
 
 Deployment checks:
 
@@ -95,6 +95,8 @@ Deployment checks:
 - Startup migrations run successfully against Neon.
 
 Use Neon's unpooled URL for Render while the container runs `php artisan migrate --force` at startup. The pooled URL can fail during migrations because it goes through PgBouncer.
+
+Startup does not run `php artisan db:seed --force`; seed demo data only as an explicit operator action.
 
 ## Useful Commands
 

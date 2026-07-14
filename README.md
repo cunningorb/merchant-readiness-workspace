@@ -6,13 +6,13 @@ Merchant Readiness Workspace is a Laravel + Vue + Inertia application that helps
 
 - **App:** https://commerce-cartographer.onrender.com
 - **Start an assessment** (no login required): https://commerce-cartographer.onrender.com/assessment
-- **Internal workspace login:** `admin@merchant-readiness.test` / `password` — seeded automatically, reviews the demo merchants below without needing to submit anything yourself.
+- **Internal workspace login:** `admin@merchant-readiness.test` / `password` when demo data has been seeded, reviews the demo merchants below without needing to submit anything yourself.
 
-The production database is seeded with three realistic demo merchants spanning the readiness tiers (Foundational, Established, Advanced), so the internal workspace's prospect list, search/sort, and review page all have something real to show.
+Demo data includes three realistic merchants spanning the readiness tiers (Foundational, Established, Advanced), so the internal workspace's prospect list, search/sort, and review page all have something real to show when seeded.
 
 ## Features
 
-- **Public assessment wizard** — six sections (Business, Catalog, Return Policy, Exchanges, Manual Operations, Platform), completable anonymously, with draft answers saved section-by-section.
+- **Public assessment wizard** — four guided steps covering Business, Catalog, Return Policy, Exchanges, Manual Operations, and Platform, completable anonymously, with draft answers saved section-by-section.
 - **Rule-based scoring and recommendations** — transparent, weighted section scoring rolled up into four readiness tiers (Foundational/Developing/Established/Advanced), with recommendations generated from the actual answers, not a black box.
 - **Shareable public report** — every submitted assessment gets a secure, tokenized report URL, accessible without authentication.
 - **Internal workspace** — an authenticated prospect list (search, sortable columns, tier filtering by sort) and a review page per assessment with a rule-based Talking Points panel for sales/CS conversations.
@@ -24,7 +24,7 @@ The production database is seeded with three realistic demo merchants spanning t
 - Vue 3 + Inertia.js
 - Tailwind CSS
 - PostgreSQL in production (Render), SQLite for local development
-- Laravel queues (available for async work; not yet required by any current feature)
+- Laravel queues for import processing; production currently uses the sync driver so uploads finish without a separate worker service
 
 ## Local Development
 
@@ -59,7 +59,7 @@ Creates the admin user and three demo merchants. Safe to run more than once — 
 php artisan demo:reset
 ```
 
-This command only ever deletes and recreates rows flagged `is_demo` — it can never touch a real prospect's submitted assessment.
+This command only ever deletes and recreates rows flagged `is_demo` — it can never touch a real prospect's submitted assessment. Production startup runs migrations only; run seeding or `demo:reset` explicitly when you intentionally want demo rows in a target environment.
 
 ### Run the app
 
@@ -104,6 +104,8 @@ Render settings when creating the service manually:
 - Health check path: `/health`
 
 Required production environment variables are documented in `docs/render-deployment.md`. For Neon, set `DATABASE_URL` in Render rather than separate `DB_HOST`, `DB_DATABASE`, `DB_USERNAME`, and `DB_PASSWORD` values.
+
+The Render blueprint sets `QUEUE_CONNECTION=sync` so CSV/demo imports run during the request. If a paid worker service is added later, switch this back to `database` and run `php artisan queue:work --tries=1` in the worker.
 
 Developer dashboard links, local testing commands, and deployment utilities are collected in `docs/developer-resources.md`.
 
