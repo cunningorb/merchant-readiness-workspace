@@ -25,12 +25,14 @@ services:
         value: "database"
       - key: QUEUE_CONNECTION
         value: "sync"
+      # sync:false: a dashboard edit here (e.g. correcting the from address)
+      # must never be silently reset by a later blueprint sync/deploy.
       - key: MAIL_MAILER
-        value: "resend"
+        sync: false
       - key: MAIL_FROM_ADDRESS
-        value: "no_reply@normalview.pro"
+        sync: false
       - key: MAIL_FROM_NAME
-        value: "Commerce Cartographer"
+        sync: false
       - key: RESEND_KEY
         sync: false
       - key: APP_KEY
