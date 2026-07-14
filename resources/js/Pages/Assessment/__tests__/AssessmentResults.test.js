@@ -81,7 +81,7 @@ describe('AssessmentResults', () => {
         });
 
         expect(wrapper.text()).toContain("Cotopaxi's returns opportunity report");
-        expect(wrapper.text()).toContain('Your estimated opportunity');
+        expect(wrapper.text()).toContain('Recommended switch');
         expect(wrapper.text()).toContain('Retained revenue potential');
         expect(wrapper.text()).not.toContain('Score breakdown');
         expect(wrapper.text()).not.toContain('Capability mapping');

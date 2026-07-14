@@ -40,58 +40,95 @@ const quantifiedRange = computed(() => {
 
     return unit ? `${range} ${unit}` : range;
 });
+
+const statRange = computed(() => (kind.value === 'monetary' ? monetaryRange.value : quantifiedRange.value));
+const switchLabel = computed(() => {
+    if (props.opportunity.type === 'retained_revenue') {
+        return 'exchange-first automation';
+    }
+
+    if (props.opportunity.type === 'manual_work_savings') {
+        return 'low-risk return automation';
+    }
+
+    if (props.opportunity.type === 'support_contact_reduction') {
+        return 'clearer policy routing';
+    }
+
+    return 'a stronger returns workflow';
+});
+
+function compactMoney(value) {
+    return `$${Math.round(value / 1000).toLocaleString('en-US')}K`;
+}
+
+const impactChip = computed(() => {
+    if (kind.value !== 'monetary') {
+        return `+ ${statRange.value}`;
+    }
+
+    return `+ ${compactMoney(props.opportunity.minimum_value)} - ${compactMoney(props.opportunity.maximum_value)} est. annual revenue`;
+});
 </script>
 
 <template>
     <section
         data-testid="opportunity-hero"
-        class="rounded-3xl border border-blue-100 bg-gradient-to-br from-blue-50 to-white p-6 shadow-sm sm:p-8"
+        class="rounded-3xl border border-blue-100 bg-gradient-to-br from-blue-50 via-white to-white p-6 shadow-sm sm:p-8"
         aria-labelledby="opportunity-hero-heading"
     >
-        <p class="text-xs font-semibold uppercase tracking-wide text-blue-600">Your estimated opportunity</p>
+        <div class="grid gap-8 md:grid-cols-[minmax(0,1fr),280px] md:items-center">
+            <div>
+                <p class="inline-flex items-center rounded-full border border-blue-200 bg-blue-100 px-3 py-1 text-xs font-bold uppercase tracking-wide text-blue-700">
+                    <span aria-hidden="true">⚡</span>
+                    <span class="ml-1">Recommended switch</span>
+                </p>
 
-        <h2 v-if="kind === 'monetary'" id="opportunity-hero-heading" class="mt-3 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
-            Your company could get back
-            <span class="text-blue-700">{{ monetaryRange }}</span>
-            in revenue this year
-        </h2>
+                <h2 v-if="kind === 'monetary'" id="opportunity-hero-heading" class="mt-4 text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">
+                    Your returns could be earning more with <span class="text-blue-600">{{ switchLabel }}</span>.
+                </h2>
 
-        <template v-else-if="kind === 'quantified'">
-            <h2 id="opportunity-hero-heading" class="mt-3 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
-                {{ opportunity.title }}
-            </h2>
-            <p class="mt-2 text-2xl font-bold text-blue-700 sm:text-3xl">{{ quantifiedRange }}</p>
-        </template>
+                <template v-else-if="kind === 'quantified'">
+                    <h2 id="opportunity-hero-heading" class="mt-4 text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">
+                        {{ opportunity.title }}
+                    </h2>
+                </template>
 
-        <h2 v-else id="opportunity-hero-heading" class="mt-3 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
-            {{ opportunity.title }}
-        </h2>
+                <h2 v-else id="opportunity-hero-heading" class="mt-4 text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">
+                    {{ opportunity.title }}
+                </h2>
 
-        <p class="mt-3 max-w-2xl text-slate-600">{{ opportunity.summary }}</p>
+                <p class="mt-3 max-w-2xl text-sm leading-6 text-slate-600">{{ opportunity.summary }}</p>
 
-        <div class="mt-4 flex flex-wrap items-center gap-2">
-            <ConfidenceBadge :level="opportunity.confidence" />
-            <EffortBadge v-if="opportunity.effort" :level="opportunity.effort" />
-            <button
-                type="button"
-                data-testid="sales-contact-link"
-                class="inline-flex items-center rounded-full bg-blue-600 px-3 py-1 text-xs font-semibold text-white transition hover:bg-blue-700"
-                @click="$emit('contact-sales')"
-            >
-                Talk to the team
-            </button>
-            <button
-                v-if="hasCalculation"
-                type="button"
-                class="inline-flex items-center rounded-full border border-blue-200 bg-white px-3 py-1 text-xs font-semibold text-blue-700 transition hover:bg-blue-50"
-                @click="$emit('see-calculation')"
-            >
-                See calculation
-            </button>
+                <div class="mt-5 flex flex-wrap items-center gap-2">
+                    <span v-if="kind !== 'fallback'" class="inline-flex items-center rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">↗ {{ impactChip }}</span>
+                    <ConfidenceBadge :level="opportunity.confidence" />
+                    <EffortBadge v-if="opportunity.effort" :level="opportunity.effort" />
+                </div>
+
+                <p v-if="kind !== 'fallback'" class="mt-4 text-xs text-slate-500">
+                    Estimated range based on your answers and clearly labeled assumptions — not a promise of results.
+                </p>
+            </div>
+
+            <div class="rounded-3xl border border-blue-100 bg-white p-5 text-center shadow-sm">
+                <button
+                    type="button"
+                    data-testid="sales-contact-link"
+                    class="inline-flex w-full items-center justify-center rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
+                    @click="$emit('contact-sales')"
+                >
+                    Talk to the team
+                </button>
+                <button
+                    v-if="hasCalculation"
+                    type="button"
+                    class="mt-3 text-sm font-semibold text-blue-700 transition hover:text-blue-800"
+                    @click="$emit('see-calculation')"
+                >
+                    See the calculation
+                </button>
+            </div>
         </div>
-
-        <p v-if="kind !== 'fallback'" class="mt-4 text-xs text-slate-500">
-            Estimated range based on your answers and clearly labeled assumptions — not a promise of results.
-        </p>
     </section>
 </template>

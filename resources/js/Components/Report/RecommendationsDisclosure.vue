@@ -61,6 +61,7 @@ function confidenceFor(recommendation) {
                 :key="index"
                 :recommendation="recommendation"
                 :confidence="confidenceFor(recommendation)"
+                :effort="recommendation.effort"
                 :has-calculation="explanationFor(recommendation)"
                 @see-calculation="$emit('see-calculation', recommendation.opportunity_type)"
             />

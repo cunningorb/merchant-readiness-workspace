@@ -39,9 +39,9 @@ describe('OpportunityHero', () => {
             props: { opportunity: monetaryOpportunity },
         });
 
-        expect(wrapper.text()).toContain('$32,000–$51,000');
-        expect(wrapper.text()).toContain('could get back');
-        expect(wrapper.text()).toContain('this year');
+        expect(wrapper.text()).toContain('$32K - $51K');
+        expect(wrapper.text()).toContain('could be earning more');
+        expect(wrapper.text()).toContain('exchange-first automation');
         expect(wrapper.text()).not.toContain('.00');
         expect(wrapper.text()).toContain(monetaryOpportunity.summary);
     });
@@ -94,9 +94,9 @@ describe('OpportunityHero', () => {
             props: { opportunity: monetaryOpportunity, hasCalculation: false },
         });
 
-        const trigger = withCalculation.findAll('button').find((button) => button.text().includes('See calculation'));
+        const trigger = withCalculation.findAll('button').find((button) => button.text().includes('See the calculation'));
         expect(trigger).toBeTruthy();
-        expect(withoutCalculation.text()).not.toContain('See calculation');
+        expect(withoutCalculation.text()).not.toContain('See the calculation');
 
         await trigger.trigger('click');
         expect(withCalculation.emitted('see-calculation')).toHaveLength(1);

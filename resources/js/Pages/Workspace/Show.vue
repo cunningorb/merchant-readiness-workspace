@@ -1,10 +1,16 @@
 <script setup>
 import { computed, ref } from 'vue';
-import { Head, Link } from '@inertiajs/vue3';
+import axios from 'axios';
+import { Head } from '@inertiajs/vue3';
 import AuthenticatedLayout from '../../Layouts/AuthenticatedLayout.vue';
+import CapabilityAndImprovements from '../../Components/Report/CapabilityAndImprovements.vue';
 import CalculationModal from '../../Components/Report/CalculationModal.vue';
+import ExecutiveSummaryCard from '../../Components/Report/ExecutiveSummaryCard.vue';
 import OpportunityHero from '../../Components/Report/OpportunityHero.vue';
-import SupportingMetricStrip from '../../Components/Report/SupportingMetricStrip.vue';
+import RecommendationCard from '../../Components/Report/RecommendationCard.vue';
+import RecommendationsDisclosure from '../../Components/Report/RecommendationsDisclosure.vue';
+import ReportHeaderBar from '../../Components/Report/ReportHeaderBar.vue';
+import ScoreBreakdownCard from '../../Components/Report/ScoreBreakdownCard.vue';
 
 const props = defineProps({
     report: {
@@ -44,10 +50,51 @@ const explanations = computed(() => props.report.calculationExplanations ?? {});
 const heroHasCalculation = computed(() =>
     props.report.heroOpportunity.type != null && explanations.value[props.report.heroOpportunity.type] != null);
 
-const enrichedMetrics = computed(() => props.report.supportingMetrics.map((metric) => ({
-    ...metric,
-    confidence: metric.source === 'opportunity' ? explanations.value[metric.key]?.confidence ?? null : null,
-})));
+const fallbackRecommendations = computed(() => {
+    if ((props.report.topRecommendations ?? []).length > 0) {
+        return [];
+    }
+
+    const hero = props.report.heroOpportunity;
+
+    return [
+        {
+            title: hero.type === 'retained_revenue' ? 'Switch to exchange-first automation' : hero.title,
+            description: hero.summary,
+            category: hero.type === 'retained_revenue' ? 'exchanges' : 'manual_operations',
+            priority: 'high',
+            expected_impact: hero.kind === 'monetary' ? 'Retained revenue' : 'Operational lift',
+            opportunity_type: hero.type,
+            effort: hero.effort,
+        },
+        {
+            title: 'Automate low-risk approvals',
+            description: 'Auto-approve returns that meet clear criteria and route only genuine exceptions to the team.',
+            category: 'manual_operations',
+            priority: 'high',
+            expected_impact: 'Lower manual review load',
+            opportunity_type: 'manual_work_savings',
+            effort: 'medium',
+        },
+        {
+            title: 'Segment return policies by category',
+            description: 'Replace one blanket policy with distinct windows and rules for categories that create avoidable returns.',
+            category: 'return_policy',
+            priority: 'medium',
+            expected_impact: 'Lower avoidable returns',
+            opportunity_type: 'support_contact_reduction',
+            effort: 'low',
+        },
+    ];
+});
+const displayTopRecommendations = computed(() => [...(props.report.topRecommendations ?? []), ...fallbackRecommendations.value].slice(0, 3));
+const primaryRecommendation = computed(() => displayTopRecommendations.value[0] ?? null);
+const secondaryRecommendations = computed(() => displayTopRecommendations.value.slice(1));
+const remainingRecommendations = computed(() => props.report.remainingRecommendations ?? []);
+const allRecommendations = computed(() => [
+    ...displayTopRecommendations.value,
+    ...(props.report.remainingRecommendations ?? []),
+]);
 
 const activeExplanationType = ref(null);
 const salesModalOpen = ref(false);
@@ -73,18 +120,37 @@ function openSalesContact() {
 function closeSalesContact() {
     salesModalOpen.value = false;
 }
+
+function hasCalculation(recommendation) {
+    return recommendation.opportunity_type != null && explanations.value[recommendation.opportunity_type] != null;
+}
+
+function confidenceFor(recommendation) {
+    return explanations.value[recommendation.opportunity_type]?.confidence ?? null;
+}
+
+function notifyContactRequest() {
+    axios.post(`/api/reports/${props.report.token}/contact`).catch(() => {});
+}
+
+function handleSalesContact() {
+    salesModalOpen.value = true;
+    notifyContactRequest();
+}
+
+function printReport() {
+    window.print();
+}
 </script>
 
 <template>
     <Head :title="report.merchant.company_name" />
 
     <AuthenticatedLayout>
-        <template #header>
-            <Link :href="route('dashboard')" class="text-sm font-medium text-blue-600 hover:text-blue-700"><span aria-hidden="true">&larr;</span> Back to prospects</Link>
-        </template>
+        <ReportHeaderBar :company-name="report.merchant.company_name" :share-url="report.url" :back-href="route('dashboard')" @download="printReport" @contact-sales="handleSalesContact" />
 
-        <div class="py-12">
-            <div class="mx-auto max-w-5xl sm:px-6 lg:px-8">
+        <div class="py-8">
+            <div class="mx-auto max-w-6xl sm:px-6 lg:px-8">
                 <div class="mb-6">
                     <h1 class="text-2xl font-bold tracking-tight text-slate-900">{{ report.merchant.company_name }}</h1>
                     <p v-if="profileLine" class="mt-1 text-slate-600">{{ profileLine }}</p>
@@ -96,25 +162,44 @@ function closeSalesContact() {
                         :opportunity="report.heroOpportunity"
                         :has-calculation="heroHasCalculation"
                         @see-calculation="openCalculation(report.heroOpportunity.type)"
-                        @contact-sales="openSalesContact"
+                        @contact-sales="handleSalesContact"
                     />
 
-                    <SupportingMetricStrip :metrics="enrichedMetrics" />
+                    <ExecutiveSummaryCard :report="report" />
+                    <ScoreBreakdownCard :assessment="report.assessment" />
 
-                    <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                        <h3 class="text-lg font-semibold text-slate-900">Talking Points</h3>
-                        <ol class="mt-4 space-y-4">
-                            <li v-for="(point, index) in report.talking_points" :key="index" class="flex gap-3">
-                                <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-semibold text-blue-700">{{ index + 1 }}</span>
-                                <div>
-                                    <p class="font-medium text-slate-900">{{ point.title }}</p>
-                                    <p class="mt-1 text-sm text-slate-600">{{ point.description }}</p>
-                                    <p class="mt-1 text-sm text-slate-500">Expected impact: {{ point.expected_impact }}</p>
-                                </div>
-                            </li>
-                        </ol>
-                        <p v-if="report.talking_points.length === 0" class="mt-4 text-sm text-slate-500">No recommendations to highlight.</p>
-                    </div>
+                    <section aria-labelledby="top-opportunities-heading">
+                        <div class="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                            <h2 id="top-opportunities-heading" class="text-lg font-bold text-slate-950">Top opportunities</h2>
+                            <p class="text-sm text-slate-500">Ranked by business impact</p>
+                        </div>
+                        <RecommendationCard
+                            v-if="primaryRecommendation"
+                            class="mt-4"
+                            :recommendation="primaryRecommendation"
+                            primary
+                            :confidence="confidenceFor(primaryRecommendation)"
+                            :effort="primaryRecommendation.effort"
+                            :has-calculation="hasCalculation(primaryRecommendation)"
+                            @see-calculation="openCalculation(primaryRecommendation.opportunity_type)"
+                            @contact-sales="handleSalesContact"
+                        />
+                        <div v-if="secondaryRecommendations.length" class="mt-4 grid gap-4 sm:grid-cols-2">
+                            <RecommendationCard
+                                v-for="(recommendation, index) in secondaryRecommendations"
+                                :key="index"
+                                :recommendation="recommendation"
+                                :confidence="confidenceFor(recommendation)"
+                                :effort="recommendation.effort"
+                                :has-calculation="hasCalculation(recommendation)"
+                                @see-calculation="openCalculation(recommendation.opportunity_type)"
+                            />
+                        </div>
+                    </section>
+
+                    <RecommendationsDisclosure v-if="remainingRecommendations.length" :recommendations="remainingRecommendations" :calculation-explanations="explanations" @see-calculation="openCalculation" />
+
+                    <CapabilityAndImprovements :assessment="report.assessment" :recommendations="allRecommendations" />
 
                 </div>
 

@@ -53,10 +53,13 @@ class ReportBuilderService
         $assessment->loadMissing(['recommendations', 'merchant', 'answers', 'opportunities', 'benchmarkComparisons']);
 
         $opportunities = $assessment->opportunities;
+        $opportunityByType = $opportunities->keyBy('type');
         $categoryMap = config('assessment.opportunities.recommendation_category_to_opportunity_type', []);
         $rankedRecommendations = $this->ranking->rankRecommendations($assessment->recommendations, $opportunities->all());
 
         return [
+            'token' => $report->token,
+            'url' => route('reports.show', $report->token),
             'merchant' => $this->merchantProfile($assessment),
             'assessment' => [
                 'overall_score' => $assessment->overall_score,
@@ -75,10 +78,10 @@ class ReportBuilderService
             'heroOpportunity' => $this->heroOpportunity($opportunities, $assessment->recommendations),
             'supportingMetrics' => $this->supportingMetrics($opportunities, $assessment),
             'topRecommendations' => $rankedRecommendations->take(3)
-                ->map(fn (Recommendation $recommendation) => $this->recommendationItem($recommendation, $categoryMap))
+                ->map(fn (Recommendation $recommendation) => $this->recommendationItem($recommendation, $categoryMap, $opportunityByType))
                 ->values()->all(),
             'remainingRecommendations' => $rankedRecommendations->slice(3)
-                ->map(fn (Recommendation $recommendation) => $this->recommendationItem($recommendation, $categoryMap))
+                ->map(fn (Recommendation $recommendation) => $this->recommendationItem($recommendation, $categoryMap, $opportunityByType))
                 ->values()->all(),
             'calculationExplanations' => $this->calculationExplanations($opportunities),
             'actionPlan' => $this->actionPlan($rankedRecommendations),
@@ -218,15 +221,18 @@ class ReportBuilderService
     /**
      * @param  array<string, string>  $categoryMap
      */
-    private function recommendationItem(Recommendation $recommendation, array $categoryMap): array
+    private function recommendationItem(Recommendation $recommendation, array $categoryMap, Collection $opportunityByType): array
     {
+        $type = $categoryMap[$recommendation->category] ?? null;
+
         return [
             'title' => $recommendation->title,
             'description' => $recommendation->description,
             'category' => $recommendation->category,
             'priority' => $recommendation->priority,
             'expected_impact' => $recommendation->expected_impact,
-            'opportunity_type' => $categoryMap[$recommendation->category] ?? null,
+            'opportunity_type' => $type,
+            'effort' => $type !== null ? $opportunityByType->get($type)?->effort : null,
         ];
     }
 

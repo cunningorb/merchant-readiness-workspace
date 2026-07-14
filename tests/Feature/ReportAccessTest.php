@@ -4,7 +4,9 @@ namespace Tests\Feature;
 
 use App\Models\Assessment;
 use App\Models\Report;
+use App\Mail\ReportContactRequested;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Mail;
 use Tests\TestCase;
 
 class ReportAccessTest extends TestCase
@@ -92,6 +94,38 @@ class ReportAccessTest extends TestCase
                 'calculationExplanations',
                 'actionPlan' => ['this_week', 'plan_next'],
             ]);
+    }
+
+    public function test_contact_endpoint_emails_internal_team_with_report_link(): void
+    {
+        Mail::fake();
+        $report = $this->reportedAssessment();
+        $report->assessment->merchant()->update([
+            'company_name' => 'Northwind Supply',
+            'contact_email' => 'ops@northwind.test',
+        ]);
+
+        $response = $this->postJson("/api/reports/{$report->token}/contact");
+
+        $response->assertOk()->assertJsonPath('status', 'queued');
+
+        Mail::assertSent(ReportContactRequested::class, function (ReportContactRequested $mail) use ($report): bool {
+            return $mail->hasTo('micah@normalview.pro')
+                && $mail->companyName === 'Northwind Supply'
+                && $mail->contactEmail === 'ops@northwind.test'
+                && $mail->reportUrl === route('reports.show', $report->token);
+        });
+    }
+
+    public function test_contact_endpoint_404s_for_unpublished_report(): void
+    {
+        Mail::fake();
+        $assessment = Assessment::factory()->create();
+        $report = Report::factory()->for($assessment)->create(['published_at' => null]);
+
+        $this->postJson("/api/reports/{$report->token}/contact")->assertNotFound();
+
+        Mail::assertNothingSent();
     }
 
     public function test_web_report_page_receives_opportunity_first_payload_keys(): void
