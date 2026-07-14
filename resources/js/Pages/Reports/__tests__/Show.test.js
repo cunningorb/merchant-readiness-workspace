@@ -240,7 +240,7 @@ describe('Reports/Show', () => {
         const wrapper = mountShow();
 
         expect(wrapper.get('[data-testid="header-contact-sales"]').classes()).toContain('px-5');
-        expect(wrapper.get('[data-testid="sales-contact-link"]').classes()).toContain('px-5');
+        expect(wrapper.get('[data-testid="sales-contact-link"]').classes()).toContain('px-8');
         expect(wrapper.get('[data-testid="primary-card-contact-sales"]').classes()).toContain('px-5');
         expect(wrapper.get('[data-testid="sales-contact-link"]').classes()).not.toContain('w-full');
         expect(wrapper.get('[data-testid="primary-card-contact-sales"]').classes()).not.toContain('w-full');

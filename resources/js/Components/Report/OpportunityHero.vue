@@ -115,7 +115,7 @@ const impactChip = computed(() => {
                 <button
                     type="button"
                     data-testid="sales-contact-link"
-                    class="inline-flex max-w-full items-center justify-center rounded-xl bg-blue-600 px-5 py-2.5 text-center text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
+                    class="inline-flex max-w-full items-center justify-center rounded-xl bg-blue-600 px-8 py-3.5 text-center text-base font-semibold text-white shadow-lg shadow-blue-200 transition hover:bg-blue-700"
                     @click="$emit('contact-sales')"
                 >
                     Talk to the team
@@ -123,7 +123,7 @@ const impactChip = computed(() => {
                 <button
                     v-if="hasCalculation"
                     type="button"
-                    class="inline-flex max-w-full items-center justify-center rounded-xl border border-blue-200 bg-blue-100 px-5 py-2.5 text-center text-sm font-semibold text-blue-800 shadow-sm transition hover:bg-blue-200"
+                    class="text-sm font-semibold text-blue-700 transition hover:text-blue-800 hover:underline"
                     @click="$emit('see-calculation')"
                 >
                     See the calculation
