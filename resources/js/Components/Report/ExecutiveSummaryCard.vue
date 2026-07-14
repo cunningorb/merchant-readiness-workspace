@@ -24,18 +24,16 @@ const peerCaption = computed(() => {
     return platform ? `of ${platform} peers` : 'of similar peers';
 });
 const summary = computed(() => {
-    const company = props.report.merchant.company_name;
-    const tier = props.report.assessment.overall_tier;
     const driver = hero.value.type === 'retained_revenue'
         ? 'exchange-first automation is the strongest near-term lever'
         : `${hero.value.title?.toLowerCase() ?? 'the top opportunity'} is the strongest near-term lever`;
 
-    return `${company} shows ${tier.toLowerCase()} returns maturity. Fundamentals are in place, but ${driver}. The prioritized changes below focus on recoverable revenue, lower review load, and a cleaner customer experience within weeks.`;
+    return `Fundamentals are in place, but ${driver}. The prioritized changes below focus on recoverable revenue, lower review load, and a cleaner customer experience within weeks.`;
 });
 </script>
 
 <template>
-    <section class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8" aria-labelledby="executive-summary-heading">
+    <section class="@container rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8" aria-labelledby="executive-summary-heading">
         <div class="grid gap-8 md:grid-cols-[220px,1fr] md:items-center">
             <div class="flex flex-col items-center">
                 <div class="relative h-40 w-40">
@@ -53,10 +51,13 @@ const summary = computed(() => {
             <div>
                 <p id="executive-summary-heading" class="text-xs font-medium uppercase tracking-[0.22em] text-slate-400">Executive summary</p>
                 <p class="mt-4 max-w-3xl text-base leading-7 text-slate-800">{{ summary }}</p>
-                <div class="mt-6 grid gap-0 divide-y divide-slate-200 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
-                    <div class="py-2 sm:pr-7"><p class="text-xl font-bold text-slate-950">{{ peerStat }}</p><p class="text-sm text-slate-400">{{ peerCaption }}</p></div>
-                    <div class="py-2 sm:px-7"><p class="text-xl font-bold text-blue-600">{{ Math.max(prioritizedCount, 1) }}</p><p class="text-sm text-slate-400">prioritized opportunities</p></div>
-                    <div class="py-2 sm:pl-7"><p class="text-xl font-bold text-emerald-700">{{ annualUpside }}</p><p class="text-sm text-slate-400">est. annual upside</p></div>
+                <!-- @container-relative, not sm:-viewport-relative: this card can be
+                     paired 50/50 with Executive Perspective, so a 3-way split only
+                     fits once the card itself (not the page) is wide enough. -->
+                <div class="mt-6 grid gap-0 divide-y divide-slate-200 @2xl:grid-cols-3 @2xl:divide-x @2xl:divide-y-0">
+                    <div class="py-2 @2xl:pr-7"><p class="text-xl font-bold text-slate-950">{{ peerStat }}</p><p class="text-sm text-slate-400">{{ peerCaption }}</p></div>
+                    <div class="py-2 @2xl:px-7"><p class="text-xl font-bold text-blue-600">{{ Math.max(prioritizedCount, 1) }}</p><p class="text-sm text-slate-400">prioritized opportunities</p></div>
+                    <div class="py-2 @2xl:pl-7"><p class="text-xl font-bold text-emerald-700 break-words">{{ annualUpside }}</p><p class="text-sm text-slate-400">est. annual upside</p></div>
                 </div>
             </div>
         </div>
