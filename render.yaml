@@ -37,3 +37,35 @@ services:
         sync: false
       - key: APP_URL
         sync: false
+      # Website-scan assisted autofill + AI recommendation insight (see
+      # docs/llm-extraction.md and docs/decisions/0008 and 0009). All
+      # sync:false so values entered in the Render dashboard are never
+      # reset by a blueprint sync — same treatment as the vars above.
+      # Every one of these is optional: unset (or LLM_ENABLED=false)
+      # keeps both features fully off with no behavior change.
+      - key: WEBSITE_EXTRACTION_STRATEGY
+        sync: false
+      - key: LLM_ENABLED
+        sync: false
+      - key: LLM_PROVIDER
+        sync: false
+      - key: LLM_TIMEOUT_SECONDS
+        sync: false
+      - key: LLM_MAX_INPUT_CHARACTERS
+        sync: false
+      - key: LLM_MAX_PAGES
+        sync: false
+      - key: LLM_DAILY_REQUEST_LIMIT
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_BASE_URL
+        sync: false
+      - key: GROQ_MODEL
+        sync: false
+      - key: AI_RECOMMENDATION_INSIGHT_ENABLED
+        sync: false
+      - key: AI_RECOMMENDATION_INSIGHT_CACHE_TTL_HOURS
+        sync: false
+      - key: AI_RECOMMENDATION_INSIGHT_MAX_SECONDS
+        sync: false

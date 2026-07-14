@@ -28,6 +28,9 @@ Demo data includes three realistic merchants spanning the readiness tiers (Found
 
 ## Local Development
 
+**Full setup guide (prerequisites, optional AI features, Render/Neon reference):
+[`docs/developer-resources.md`](docs/developer-resources.md).** The quick version:
+
 ### Quick setup
 
 ```bash
@@ -107,7 +110,7 @@ Required production environment variables are documented in `docs/render-deploym
 
 The Render blueprint sets `QUEUE_CONNECTION=sync` so CSV/demo imports run during the request. If a paid worker service is added later, switch this back to `database` and run `php artisan queue:work --tries=1` in the worker.
 
-Developer dashboard links, local testing commands, and deployment utilities are collected in `docs/developer-resources.md`.
+See `docs/developer-resources.md` for the complete local setup walkthrough (including the optional LLM-assisted features), dashboard links, and deployment utilities.
 
 ## Project Status
 
