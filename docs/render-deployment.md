@@ -32,7 +32,7 @@ Use the Neon unpooled connection string for `DATABASE_URL` while Render runs Lar
 
 Imports use Laravel jobs. On the current single-service Render deployment, `QUEUE_CONNECTION=sync` is required so import jobs execute immediately instead of waiting in the `jobs` table with no worker. If a dedicated worker service is provisioned later, set `QUEUE_CONNECTION=database` on both services and run `php artisan queue:work --tries=1` in the worker.
 
-Report emails use Resend. Store `RESEND_KEY` as a secret environment variable in Render, not in the repository. The sender domain for `no_reply@normalview.pro` must remain verified in Resend, including Resend's DNS records.
+Report emails use Resend. Store `RESEND_KEY` as a secret environment variable in Render, not in the repository. The app also accepts Laravel's conventional `RESEND_API_KEY` name, but the current Render service uses `RESEND_KEY`. The sender domain for `no_reply@normalview.pro` must remain verified in Resend, including Resend's DNS records.
 
 The Docker startup command runs `php artisan migrate --force` but does not run `php artisan db:seed --force`. Seed demo data or reset demo rows only as an explicit operator action, not on every production boot.
 
