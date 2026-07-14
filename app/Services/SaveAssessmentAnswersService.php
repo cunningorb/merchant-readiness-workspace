@@ -17,6 +17,10 @@ class SaveAssessmentAnswersService
             abort(409, 'This assessment has already been submitted and cannot be edited.');
         }
 
+        if ($answers === []) {
+            return $assessment->load('answers');
+        }
+
         $now = now();
 
         AssessmentAnswer::upsert(

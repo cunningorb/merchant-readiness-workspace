@@ -4,7 +4,9 @@ namespace Tests\Feature;
 
 use App\Models\Assessment;
 use App\Models\AssessmentAnswer;
+use App\Mail\AssessmentReportReady;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Mail;
 use Tests\TestCase;
 
 class AssessmentSubmissionTest extends TestCase
@@ -42,6 +44,7 @@ class AssessmentSubmissionTest extends TestCase
 
     public function test_submitting_a_complete_assessment_returns_score_and_recommendations(): void
     {
+        Mail::fake();
         $assessment = $this->completeAssessment();
 
         $response = $this->postJson("/api/assessments/{$assessment->id}/submit");
@@ -49,7 +52,9 @@ class AssessmentSubmissionTest extends TestCase
         $response->assertOk()
             ->assertJsonPath('assessment.status', 'submitted')
             ->assertJsonPath('assessment.overall_score', 9)
-            ->assertJsonPath('assessment.overall_tier', 'Foundational');
+            ->assertJsonPath('assessment.overall_tier', 'Foundational')
+            ->assertJsonPath('merchant.company_name', 'Northwind Supply')
+            ->assertJsonPath('merchant.contact_email', 'ops@example.com');
 
         $response->assertJsonCount(6, 'recommendations');
         $this->assertDatabaseHas('assessments', ['id' => $assessment->id, 'status' => 'submitted']);
@@ -68,6 +73,15 @@ class AssessmentSubmissionTest extends TestCase
         $reportToken = $response->json('report.token');
         $this->assertNotEmpty($reportToken);
         $this->assertSame(route('reports.show', $reportToken), $response->json('report.url'));
+        $this->assertSame('Northwind Supply', $response->json('report.payload.merchant.company_name'));
+        $this->assertNotEmpty($response->json('report.payload.heroOpportunity.title'));
+        $this->assertIsArray($response->json('report.payload.topRecommendations'));
+
+        Mail::assertSent(AssessmentReportReady::class, function (AssessmentReportReady $mail) use ($reportToken): bool {
+            return $mail->hasTo('ops@example.com')
+                && $mail->companyName === 'Northwind Supply'
+                && $mail->reportUrl === route('reports.show', $reportToken);
+        });
     }
 
     public function test_submitting_an_incomplete_assessment_is_rejected(): void
@@ -83,11 +97,15 @@ class AssessmentSubmissionTest extends TestCase
 
     public function test_submitting_an_already_submitted_assessment_is_rejected(): void
     {
+        Mail::fake();
         $assessment = $this->completeAssessment();
         $this->postJson("/api/assessments/{$assessment->id}/submit")->assertOk();
+
+        Mail::assertSent(AssessmentReportReady::class, 1);
 
         $response = $this->postJson("/api/assessments/{$assessment->id}/submit");
 
         $response->assertStatus(409);
+        Mail::assertSent(AssessmentReportReady::class, 1);
     }
 }

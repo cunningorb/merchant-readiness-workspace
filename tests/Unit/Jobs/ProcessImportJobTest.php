@@ -137,6 +137,7 @@ class ProcessImportJobTest extends TestCase
         $fresh = $import->fresh();
         $this->assertSame(ImportStatus::CompletedWithWarnings->value, $fresh->status);
         $this->assertSame(1, $fresh->errors_count);
+        $this->assertSame(1, $fresh->warnings_count);
         $this->assertSame([], $fresh->metadata['pending_data_types']);
     }
 

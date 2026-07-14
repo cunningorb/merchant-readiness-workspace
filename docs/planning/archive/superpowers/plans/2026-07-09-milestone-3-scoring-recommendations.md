@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Compute a readiness score and generate rule-based recommendations when a merchant submits their assessment, and expose both through a new `POST /api/assessments/{assessment}/submit` endpoint, per the approved spec at `docs/superpowers/specs/2026-07-09-milestone-3-scoring-recommendations-design.md`.
+**Goal:** Compute a readiness score and generate rule-based recommendations when a merchant submits their assessment, and expose both through a new `POST /api/assessments/{assessment}/submit` endpoint, per the approved spec at `docs/planning/archive/superpowers/specs/2026-07-09-milestone-3-scoring-recommendations-design.md`.
 
 **Architecture:** Two independent, container-wired registries of small classes — one `QuestionScorer` per scored question, one `RecommendationRule` per recommendation trigger — each aggregated by a thin service (`ReadinessScoringService`, `RecommendationEngine`). `SubmitAssessmentService` orchestrates completeness validation, scoring, recommendation generation, and persistence, then a new controller action and route expose it. A minimal, unstyled wizard button lets a human verify recommendation quality end-to-end (the Milestone 3 STOP gate); the polished dashboard is Milestone 4.
 

@@ -24,7 +24,15 @@ services:
       - key: CACHE_STORE
         value: "database"
       - key: QUEUE_CONNECTION
-        value: "database"
+        value: "sync"
+      - key: MAIL_MAILER
+        value: "resend"
+      - key: MAIL_FROM_ADDRESS
+        value: "no_reply@normalview.pro"
+      - key: MAIL_FROM_NAME
+        value: "Commerce Cartographer"
+      - key: RESEND_KEY
+        sync: false
       - key: APP_KEY
         sync: false
       - key: APP_URL

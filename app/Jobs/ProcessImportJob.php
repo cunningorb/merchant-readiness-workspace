@@ -48,7 +48,7 @@ abstract class ProcessImportJob implements ShouldQueue
     {
         $dataImport = DataImport::find($this->dataImportId);
 
-        if ($dataImport === null || $dataImport->status === ImportStatus::Cancelled->value) {
+        if ($dataImport === null || $this->isTerminal($dataImport->status)) {
             return;
         }
 
@@ -89,7 +89,7 @@ abstract class ProcessImportJob implements ShouldQueue
         return DB::transaction(function () use ($dataImportId) {
             $dataImport = DataImport::query()->lockForUpdate()->find($dataImportId);
 
-            if ($dataImport === null || $dataImport->status === ImportStatus::Cancelled->value) {
+            if ($dataImport === null || $this->isTerminal($dataImport->status)) {
                 return null;
             }
 
@@ -114,5 +114,15 @@ abstract class ProcessImportJob implements ShouldQueue
             'data_import_id' => $dataImport->id,
             'message' => $message,
         ]);
+    }
+
+    private function isTerminal(string $status): bool
+    {
+        return in_array($status, [
+            ImportStatus::Completed->value,
+            ImportStatus::CompletedWithWarnings->value,
+            ImportStatus::Failed->value,
+            ImportStatus::Cancelled->value,
+        ], true);
     }
 }

@@ -188,16 +188,16 @@ describe('Reports/Show', () => {
         expect(wrapper.get('[role="dialog"]').text()).toContain('A sales team member will be contacting you at ops@northwind.test shortly.');
     });
 
-    it('keeps the full diagnostic breakdown demoted below the opportunity content', () => {
+    it('does not render the legacy diagnostic breakdown surface', () => {
         const wrapper = mountShow();
         const html = wrapper.html();
 
-        const diagnosticIndex = html.indexOf('Full diagnostic breakdown');
         const heroIndex = html.indexOf('data-testid="opportunity-hero"');
 
-        expect(diagnosticIndex).toBeGreaterThan(heroIndex);
-        expect(wrapper.text()).toContain('Score breakdown');
-        expect(wrapper.text()).toContain('Capability mapping');
+        expect(heroIndex).toBeGreaterThan(-1);
+        expect(html).not.toContain('Full diagnostic breakdown');
+        expect(wrapper.text()).not.toContain('Score breakdown');
+        expect(wrapper.text()).not.toContain('Capability mapping');
     });
 
     it('places the peer perspective section between the recommendations disclosure and the action plan', () => {

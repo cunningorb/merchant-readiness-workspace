@@ -12,9 +12,10 @@ class ReadinessScoringService implements AssessmentScorer
     /**
      * @param QuestionScorer[] $questionScorers
      */
-    public function __construct(private readonly array $questionScorers)
-    {
-    }
+    public function __construct(
+        private readonly array $questionScorers,
+        private readonly AssessmentQuestionCatalog $catalog,
+    ) {}
 
     public function score(Assessment $assessment): ScoreBreakdown
     {
@@ -24,6 +25,11 @@ class ReadinessScoringService implements AssessmentScorer
 
         foreach ($this->questionScorers as $scorer) {
             $value = $assessment->answerValue($scorer->questionKey());
+
+            if ($this->shouldSkipOptionalBlank($scorer->questionKey(), $value)) {
+                continue;
+            }
+
             $pointsBySection[$scorer->section()][] = $scorer->score($value);
         }
 
@@ -58,5 +64,14 @@ class ReadinessScoringService implements AssessmentScorer
         }
 
         return 'Advanced';
+    }
+
+    private function shouldSkipOptionalBlank(string $questionKey, mixed $value): bool
+    {
+        $question = $this->catalog->question($questionKey);
+
+        return $question !== null
+            && ! ($question['required'] ?? false)
+            && ($value === null || $value === '' || $value === []);
     }
 }

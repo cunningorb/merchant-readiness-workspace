@@ -1,0 +1,2 @@
+period_start,period_end,order_count,annualized_order_volume,average_order_value,refund_amount_total,refund_units_total,estimated_refund_rate,exchange_share,refund_only_share,average_time_to_refund_days
+2025-01-01,2025-12-31,132000,132000,86.75,1432200.50,18750,0.142,0.31,0.69,5.8

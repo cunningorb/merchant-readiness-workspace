@@ -121,13 +121,16 @@ Assessment sections:
 - Manual Operations
 - Platform
 
-Results must show:
+Results must show the value-proposition report format:
 
 - Readiness score
-- Score breakdown
+- Hero opportunity
+- Supporting metrics
 - Top opportunities
 - Recommended actions
-- Capability mapping
+- Clear calculation explanations
+
+Do not re-expose the legacy diagnostic score-breakdown/capability-mapping report as an end-user surface.
 
 Use a clean SaaS dashboard style with cards, score rings, progress bars, strong spacing, responsive layouts, and high trust. The reference UI uses a blue-forward visual direction and Geist-style typography; preserve that direction unless deliberately improving it.
 

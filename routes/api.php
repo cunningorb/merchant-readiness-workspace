@@ -3,11 +3,13 @@
 use App\Http\Controllers\AssessmentController;
 use App\Http\Controllers\ImportController;
 use App\Http\Controllers\ReportController;
+use App\Http\Controllers\WebsiteScanController;
 use Illuminate\Support\Facades\Route;
 
-Route::post('/assessments', [AssessmentController::class, 'store']);
-Route::post('/assessments/{assessment}/answers', [AssessmentController::class, 'answers']);
-Route::post('/assessments/{assessment}/submit', [AssessmentController::class, 'submit']);
+Route::post('/assessments', [AssessmentController::class, 'store'])->middleware('throttle:20,1');
+Route::post('/assessments/{assessment}/answers', [AssessmentController::class, 'answers'])->middleware('throttle:60,1');
+Route::post('/assessments/{assessment}/website-scan', [WebsiteScanController::class, 'store'])->middleware('throttle:10,1');
+Route::post('/assessments/{assessment}/submit', [AssessmentController::class, 'submit'])->middleware('throttle:20,1');
 Route::get('/reports/{report:token}', [ReportController::class, 'apiShow']);
 
 // These endpoints are anonymous (consistent with the anonymous-assessment

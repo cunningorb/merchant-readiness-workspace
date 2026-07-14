@@ -1,6 +1,5 @@
 <script setup>
 import { computed, ref } from 'vue';
-import AssessmentResults from '../Assessment/AssessmentResults.vue';
 import ActionPlan from '../../Components/Report/ActionPlan.vue';
 import CalculationModal from '../../Components/Report/CalculationModal.vue';
 import OpportunityHero from '../../Components/Report/OpportunityHero.vue';
@@ -19,11 +18,6 @@ const props = defineProps({
         required: true,
     },
 });
-
-const result = computed(() => ({
-    assessment: props.report.assessment,
-    recommendations: props.report.recommendations,
-}));
 
 const profileLine = computed(() => {
     const parts = [];
@@ -180,12 +174,6 @@ function printReport() {
 
                 <ActionPlan :plan="report.actionPlan" />
 
-                <section aria-labelledby="diagnostic-heading">
-                    <h2 id="diagnostic-heading" class="text-sm font-semibold uppercase tracking-wide text-slate-400">
-                        Full diagnostic breakdown
-                    </h2>
-                    <AssessmentResults :result="result" :catalog="catalog" />
-                </section>
             </div>
 
             <CalculationModal :open="activeExplanation !== null" :explanation="activeExplanation" @close="closeCalculation" />

@@ -1,6 +1,10 @@
 <?php
 
 return [
+    'website_extraction' => [
+        'strategy' => env('WEBSITE_EXTRACTION_STRATEGY', 'rules'),
+    ],
+
     'opportunities' => [
         'formula_version' => '1.0',
 

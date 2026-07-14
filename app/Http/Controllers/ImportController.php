@@ -9,6 +9,7 @@ use App\Http\Requests\StoreDataImportFileRequest;
 use App\Models\Assessment;
 use App\Models\DataImport;
 use App\Models\DataImportFile;
+use App\Services\Imports\ApplyImportedEvidenceToAnswersService;
 use App\Services\Imports\Demo\DemoDataProvider;
 use App\Services\Imports\ImportCoordinator;
 use Illuminate\Http\JsonResponse;
@@ -24,6 +25,8 @@ use LogicException;
  */
 class ImportController extends Controller
 {
+    public function __construct(private readonly ApplyImportedEvidenceToAnswersService $applyImportedEvidenceToAnswers) {}
+
     public function store(StartImportRequest $request, Assessment $assessment, ImportCoordinator $coordinator): JsonResponse
     {
         $data = $request->validated();
@@ -145,7 +148,12 @@ class ImportController extends Controller
 
     private function respondWithImport(DataImport $dataImport, int $status = 200): JsonResponse
     {
+        if (in_array($dataImport->status, [ImportStatus::Completed->value, ImportStatus::CompletedWithWarnings->value], true)) {
+            $this->applyImportedEvidenceToAnswers->apply($dataImport->assessment);
+        }
+
         $dataImport->loadMissing(['files', 'errors']);
+        $dataImport->assessment->load('answers');
 
         return response()->json([
             'data_import' => [
@@ -173,6 +181,13 @@ class ImportController extends Controller
                     'message' => $error->message,
                 ])->values(),
             ],
+            'answers' => $dataImport->assessment->answers
+                ->map(fn ($answer) => [
+                    'question_key' => $answer->question_key,
+                    'section' => $answer->section,
+                    'value' => $answer->value,
+                ])
+                ->values(),
         ], $status);
     }
 }

@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add internal-staff authentication and the five core domain models (Merchant, Assessment, AssessmentAnswer, Recommendation, Report) with their relationships, factories, seeders, and TDD test coverage, per the approved spec at `docs/specs/2026-07-08-milestone-1-authentication-core-models-design.md`.
+**Goal:** Add internal-staff authentication and the five core domain models (Merchant, Assessment, AssessmentAnswer, Recommendation, Report) with their relationships, factories, seeders, and TDD test coverage, per the approved spec at `docs/planning/archive/specs/2026-07-08-milestone-1-authentication-core-models-design.md`.
 
 **Architecture:** Laravel Breeze (Vue/Inertia stack) provides session-based internal auth, with public self-registration removed since staff accounts are provisioned, not self-served. Five new Eloquent models sit under `app/Models`, each with a migration, factory, and relationship methods per the spec's schema. Assessment uses a ULID primary key (route-safe for the future anonymous public API); the other four models use normal auto-increment IDs.
 
@@ -15,7 +15,7 @@
   wsl -d Ubuntu -- bash -lc "cd '/mnt/c/Users/Micah/source/repos/merchant-readiness-workspace' && <command>"
   ```
   PHP 8.5, Composer 2.10, and Node 22/npm 9 are already installed there. Substitute `<command>` with the bare command shown in each step below.
-- Follow `docs/specs/2026-07-08-milestone-1-authentication-core-models-design.md` exactly for schema and field names. Do not add columns not listed there (e.g. no `total_score` on Assessment — that is Milestone 3).
+- Follow `docs/planning/archive/specs/2026-07-08-milestone-1-authentication-core-models-design.md` exactly for schema and field names. Do not add columns not listed there (e.g. no `total_score` on Assessment — that is Milestone 3).
 - Assessment's `section`/`category`-style fields use machine keys only: `business`, `catalog`, `policy`, `exchanges`, `operations`, `platform`.
 - New models use the project's existing casts style: a `protected function casts(): array` method (see `app/Models/User.php`), not the older `protected $casts` property.
 - **The `/health` JSON endpoint in `routes/web.php` must keep working after every task** — it is required by `render.yaml`'s health check and by the CI workflow (`.github/workflows/ci.yml`). Milestone 0 is not allowed to regress.

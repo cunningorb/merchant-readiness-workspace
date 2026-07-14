@@ -3,7 +3,9 @@
 namespace Tests\Feature\Imports;
 
 use App\Enums\ImportStatus;
+use App\Jobs\ProcessCatalogImportJob;
 use App\Models\Assessment;
+use App\Models\DataImport;
 use App\Models\DataImportError;
 use App\Models\DataImportFile;
 use App\Models\Merchant;
@@ -12,6 +14,7 @@ use App\Models\MerchantLocationMetric;
 use App\Models\MerchantOrderMetric;
 use App\Models\MerchantProduct;
 use App\Models\MerchantReturnMetric;
+use App\Services\Imports\ImportProviderRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Schema;
@@ -109,12 +112,90 @@ class ImportEndpointsTest extends TestCase
         $show->assertJsonPath('data_import.status', ImportStatus::Completed->value);
         $show->assertJsonPath('data_import.errors_count', 0);
         $this->assertCount(3, $show->json('data_import.files'));
+        $this->assertSame(
+            'Under 1,000',
+            collect($show->json('answers'))->firstWhere('question_key', 'business.monthly_order_volume')['value'],
+        );
+        $this->assertSame(
+            'Under 500',
+            collect($show->json('answers'))->firstWhere('question_key', 'catalog.sku_count')['value'],
+        );
 
         $this->assertSame(1, MerchantProduct::query()->where('source_import_id', $importId)->count());
         $this->assertSame(1, MerchantOrderMetric::query()->where('source_import_id', $importId)->count());
         $this->assertSame(1, MerchantReturnMetric::query()->where('source_import_id', $importId)->count());
         $this->assertSame(1, MerchantInventoryMetric::query()->where('source_import_id', $importId)->count());
         $this->assertSame(1, MerchantLocationMetric::query()->where('source_import_id', $importId)->count());
+    }
+
+    public function test_shopify_like_sample_files_import_successfully(): void
+    {
+        Storage::fake('local');
+        $assessment = $this->assessment();
+        $importId = $this->postJson("/api/assessments/{$assessment->id}/imports", [
+            'provider' => 'csv',
+        ])->json('data_import.id');
+
+        $this->postJson("/api/assessments/{$assessment->id}/imports/{$importId}/files", [
+            'data_type' => 'catalog',
+            'file' => UploadedFile::fake()->createWithContent(
+                'products.csv',
+                file_get_contents(base_path('docs/sample-data/shopify-like/products.csv')),
+            ),
+        ])->assertOk();
+
+        $this->postJson("/api/assessments/{$assessment->id}/imports/{$importId}/files", [
+            'data_type' => 'orders_returns',
+            'file' => UploadedFile::fake()->createWithContent(
+                'orders_and_returns.csv',
+                file_get_contents(base_path('docs/sample-data/shopify-like/orders_and_returns.csv')),
+            ),
+        ])->assertOk();
+
+        $this->postJson("/api/assessments/{$assessment->id}/imports/{$importId}/files", [
+            'data_type' => 'inventory_locations',
+            'file' => UploadedFile::fake()->createWithContent(
+                'inventory_and_locations.csv',
+                file_get_contents(base_path('docs/sample-data/shopify-like/inventory_and_locations.csv')),
+            ),
+        ])->assertOk();
+
+        $this->postJson("/api/assessments/{$assessment->id}/imports/{$importId}/process")->assertOk();
+
+        $show = $this->getJson("/api/assessments/{$assessment->id}/imports/{$importId}")
+            ->assertOk()
+            ->assertJsonPath('data_import.status', ImportStatus::Completed->value);
+
+        $answers = collect($show->json('answers'))->pluck('value', 'question_key');
+
+        $this->assertSame(12, MerchantProduct::query()->where('source_import_id', $importId)->count());
+        $this->assertSame('Under 500', $answers->get('catalog.sku_count'));
+        $this->assertSame('10,001-50,000', $answers->get('business.monthly_order_volume'));
+        $this->assertSame(1, MerchantInventoryMetric::query()->where('source_import_id', $importId)->count());
+    }
+
+    public function test_redelivered_job_after_completion_is_a_noop(): void
+    {
+        Storage::fake('local');
+        $assessment = $this->assessment();
+        $importId = $this->postJson("/api/assessments/{$assessment->id}/imports", [
+            'provider' => 'csv',
+        ])->json('data_import.id');
+
+        $this->postJson("/api/assessments/{$assessment->id}/imports/{$importId}/files", [
+            'data_type' => 'catalog',
+            'file' => UploadedFile::fake()->createWithContent('products.csv', $this->validProductsCsv()),
+        ])->assertOk();
+
+        $this->postJson("/api/assessments/{$assessment->id}/imports/{$importId}/process")
+            ->assertOk()
+            ->assertJsonPath('data_import.status', ImportStatus::Completed->value);
+
+        (new ProcessCatalogImportJob($importId))->handle(app(ImportProviderRegistry::class));
+
+        $this->assertSame(ImportStatus::Completed->value, DataImport::query()->findOrFail($importId)->status);
+        $this->assertSame(1, MerchantProduct::query()->where('source_import_id', $importId)->count());
+        $this->assertSame(0, DataImportError::query()->where('data_import_id', $importId)->count());
     }
 
     // --- Re-attaching a file for the same data type replaces it ---------------
@@ -330,6 +411,7 @@ class ImportEndpointsTest extends TestCase
         $show = $this->getJson("/api/assessments/{$assessment->id}/imports/{$importId}");
         $show->assertJsonPath('data_import.status', ImportStatus::CompletedWithWarnings->value);
         $this->assertGreaterThanOrEqual(1, $show->json('data_import.errors_count'));
+        $this->assertSame($show->json('data_import.errors_count'), $show->json('data_import.warnings_count'));
 
         // The catalog data type succeeded despite the other one failing.
         $this->assertSame(1, MerchantProduct::query()->where('source_import_id', $importId)->count());

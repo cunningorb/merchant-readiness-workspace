@@ -2,7 +2,6 @@
 import { computed, ref } from 'vue';
 import { Head, Link } from '@inertiajs/vue3';
 import AuthenticatedLayout from '../../Layouts/AuthenticatedLayout.vue';
-import AssessmentResults from '../Assessment/AssessmentResults.vue';
 import CalculationModal from '../../Components/Report/CalculationModal.vue';
 import OpportunityHero from '../../Components/Report/OpportunityHero.vue';
 import SupportingMetricStrip from '../../Components/Report/SupportingMetricStrip.vue';
@@ -17,11 +16,6 @@ const props = defineProps({
         required: true,
     },
 });
-
-const result = computed(() => ({
-    assessment: props.report.assessment,
-    recommendations: props.report.recommendations,
-}));
 
 const profileLine = computed(() => {
     const parts = [];
@@ -122,12 +116,6 @@ function closeSalesContact() {
                         <p v-if="report.talking_points.length === 0" class="mt-4 text-sm text-slate-500">No recommendations to highlight.</p>
                     </div>
 
-                    <section aria-labelledby="diagnostic-heading">
-                        <h2 id="diagnostic-heading" class="text-sm font-semibold uppercase tracking-wide text-slate-400">
-                            Full diagnostic breakdown
-                        </h2>
-                        <AssessmentResults :result="result" :catalog="catalog" />
-                    </section>
                 </div>
 
                 <CalculationModal :open="activeExplanation !== null" :explanation="activeExplanation" @close="closeCalculation" />

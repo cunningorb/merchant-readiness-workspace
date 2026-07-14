@@ -12,13 +12,14 @@ class OpportunityRankingServiceTest extends TestCase
 {
     use RefreshDatabase;
 
-    private function opportunity(string $type, float $min, float $max, string $confidence = 'medium'): AssessmentOpportunity
+    private function opportunity(string $type, float $min, float $max, string $confidence = 'medium', ?int $sortOrder = null): AssessmentOpportunity
     {
         return AssessmentOpportunity::factory()->make([
             'type' => $type,
             'minimum_value' => $min,
             'maximum_value' => $max,
             'confidence' => $confidence,
+            'sort_order' => $sortOrder,
         ]);
     }
 
@@ -84,6 +85,29 @@ class OpportunityRankingServiceTest extends TestCase
 
         $this->assertSame(
             ['Offer exchanges', 'Automate approvals', 'Clarify policy'],
+            $ranked->pluck('title')->all(),
+        );
+    }
+
+    public function test_ranks_recommendations_by_persisted_opportunity_sort_order_when_available(): void
+    {
+        $opportunities = [
+            $this->opportunity(AssessmentOpportunity::TYPE_RETAINED_REVENUE, 1000, 2000, sortOrder: 2),
+            $this->opportunity(AssessmentOpportunity::TYPE_MANUAL_WORK_SAVINGS, 5, 10, sortOrder: 0),
+            $this->opportunity(AssessmentOpportunity::TYPE_SUPPORT_CONTACT_REDUCTION, 10, 20, sortOrder: 1),
+        ];
+
+        $manualOpsRec = $this->recommendation('manual_operations', 'low', 'Automate approvals');
+        $exchangesRec = $this->recommendation('exchanges', 'low', 'Offer exchanges');
+        $policyRec = $this->recommendation('return_policy', 'low', 'Clarify policy');
+
+        $ranked = (new OpportunityRankingService)->rankRecommendations(
+            collect([$exchangesRec, $policyRec, $manualOpsRec]),
+            $opportunities,
+        );
+
+        $this->assertSame(
+            ['Automate approvals', 'Clarify policy', 'Offer exchanges'],
             $ranked->pluck('title')->all(),
         );
     }

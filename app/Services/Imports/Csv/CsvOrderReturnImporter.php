@@ -10,6 +10,7 @@ use App\Services\Imports\Csv\Concerns\LocatesDataImportFile;
 use App\Services\Imports\Csv\Concerns\ParsesCsvValues;
 use App\Services\Imports\Csv\Concerns\ReadsCsvRows;
 use App\Services\Imports\ImportCoordinator;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use RuntimeException;
 
@@ -77,32 +78,37 @@ class CsvOrderReturnImporter implements OrderReturnImporter
 
         $assessment = $dataImport->assessment;
 
-        MerchantOrderMetric::create([
-            'merchant_id' => $assessment->merchant_id,
-            'assessment_id' => $assessment->id,
-            'source_provider' => 'csv',
-            'source_import_id' => $dataImport->id,
-            'source_period_start' => $periodStart,
-            'source_period_end' => $periodEnd,
-            'order_count' => $orderCount,
-            'annualized_order_volume' => $annualizedOrderVolume,
-            'average_order_value' => $averageOrderValue,
-        ]);
+        DB::transaction(function () use ($dataImport, $assessment, $periodStart, $periodEnd, $orderCount, $annualizedOrderVolume, $averageOrderValue, $refundAmountTotal, $refundUnitsTotal, $estimatedRefundRate, $exchangeShare, $refundOnlyShare, $averageTimeToRefundDays): void {
+            MerchantOrderMetric::query()->where('source_import_id', $dataImport->id)->delete();
+            MerchantReturnMetric::query()->where('source_import_id', $dataImport->id)->delete();
 
-        MerchantReturnMetric::create([
-            'merchant_id' => $assessment->merchant_id,
-            'assessment_id' => $assessment->id,
-            'source_provider' => 'csv',
-            'source_import_id' => $dataImport->id,
-            'source_period_start' => $periodStart,
-            'source_period_end' => $periodEnd,
-            'refund_amount_total' => $refundAmountTotal,
-            'refund_units_total' => $refundUnitsTotal,
-            'estimated_refund_rate' => $estimatedRefundRate,
-            'exchange_share' => $exchangeShare,
-            'refund_only_share' => $refundOnlyShare,
-            'average_time_to_refund_days' => $averageTimeToRefundDays,
-        ]);
+            MerchantOrderMetric::create([
+                'merchant_id' => $assessment->merchant_id,
+                'assessment_id' => $assessment->id,
+                'source_provider' => 'csv',
+                'source_import_id' => $dataImport->id,
+                'source_period_start' => $periodStart,
+                'source_period_end' => $periodEnd,
+                'order_count' => $orderCount,
+                'annualized_order_volume' => $annualizedOrderVolume,
+                'average_order_value' => $averageOrderValue,
+            ]);
+
+            MerchantReturnMetric::create([
+                'merchant_id' => $assessment->merchant_id,
+                'assessment_id' => $assessment->id,
+                'source_provider' => 'csv',
+                'source_import_id' => $dataImport->id,
+                'source_period_start' => $periodStart,
+                'source_period_end' => $periodEnd,
+                'refund_amount_total' => $refundAmountTotal,
+                'refund_units_total' => $refundUnitsTotal,
+                'estimated_refund_rate' => $estimatedRefundRate,
+                'exchange_share' => $exchangeShare,
+                'refund_only_share' => $refundOnlyShare,
+                'average_time_to_refund_days' => $averageTimeToRefundDays,
+            ]);
+        });
 
         $file->update(['row_count' => 1, 'accepted_count' => 1, 'rejected_count' => 0]);
     }

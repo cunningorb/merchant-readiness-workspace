@@ -1,0 +1,13 @@
+title,product_type,vendor,tags,description_length,status,variant_count,has_size_option,has_color_option,media_count,price,compare_at_price,sku,inventory_tracked
+Trail Utility Jacket,Apparel,Cotopaxi,"outerwear;men;women;sale",420,active,8,true,true,6,145.00,175.00,JK-TRAIL-001,true
+Fleece Pullover,Apparel,Cotopaxi,"fleece;women;new",360,active,6,true,true,5,95.00,0,FL-PULL-002,true
+Everyday Hiking Pant,Apparel,Cotopaxi,"pants;men;hiking",390,active,10,true,true,4,110.00,0,PT-HIKE-003,true
+Lightweight Rain Shell,Apparel,Cotopaxi,"rainwear;outerwear;packable",440,active,7,true,true,7,160.00,190.00,RS-LITE-004,true
+Basecamp Duffel 40L,Bags,Cotopaxi,"bags;travel;gear",310,active,4,false,true,6,120.00,0,BG-DUFF-005,true
+Daypack 24L,Bags,Cotopaxi,"backpack;commute;travel",335,active,5,false,true,8,90.00,110.00,BG-DAY-006,true
+Performance Hiking Sock,Accessories,Cotopaxi,"socks;accessories;hiking",180,active,4,true,true,3,18.00,0,AC-SOCK-007,true
+Merino Beanie,Accessories,Cotopaxi,"beanie;winter;accessories",210,active,3,false,true,3,32.00,0,AC-BEAN-008,true
+Insulated Water Bottle,Accessories,Cotopaxi,"bottle;camp;gear",240,active,4,false,true,4,34.00,42.00,AC-BOTL-009,true
+Camp Hoodie,Apparel,Cotopaxi,"hoodie;men;women;cotton",330,active,8,true,true,5,78.00,0,HD-CAMP-010,true
+Travel Organizer Pouch,Bags,Cotopaxi,"travel;organizer;accessories",200,active,3,false,true,4,28.00,0,BG-POUCH-011,true
+Sun Protection Cap,Accessories,Cotopaxi,"hat;sun;trail",190,active,4,true,true,3,36.00,0,AC-CAP-012,true

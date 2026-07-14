@@ -362,8 +362,11 @@ class ReportBuilderServiceTest extends TestCase
         $this->assertSame('retained_revenue', $payload['topRecommendations'][0]['opportunity_type']);
         $this->assertNull($payload['remainingRecommendations'][0]['opportunity_type']);
 
-        // legacy key is unaffected
         $this->assertCount(4, $payload['recommendations']);
+        $this->assertSame(
+            ['Exchanges rec', 'Manual ops rec', 'Policy rec', 'Platform rec'],
+            array_column($payload['recommendations'], 'title')
+        );
         $this->assertArrayNotHasKey('opportunity_type', $payload['recommendations'][0]);
     }
 

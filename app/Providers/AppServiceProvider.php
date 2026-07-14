@@ -10,6 +10,7 @@ use App\Services\Imports\Demo\DemoCatalogImporter;
 use App\Services\Imports\Demo\DemoInventoryImporter;
 use App\Services\Imports\Demo\DemoOrderReturnImporter;
 use App\Services\Imports\ImportProviderRegistry;
+use App\Services\AssessmentQuestionCatalog;
 use App\Services\ReadinessScoringService;
 use App\Services\RecommendationEngine;
 use Illuminate\Support\Facades\Vite;
@@ -28,7 +29,7 @@ class AppServiceProvider extends ServiceProvider
                 config('scoring.scorers'),
             );
 
-            return new ReadinessScoringService($scorers);
+            return new ReadinessScoringService($scorers, $app->make(AssessmentQuestionCatalog::class));
         });
 
         $this->app->bind(AssessmentScorer::class, ReadinessScoringService::class);
