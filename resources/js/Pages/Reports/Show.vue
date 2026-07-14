@@ -159,10 +159,10 @@ function printReport() {
                     @contact-sales="openSalesContact"
                 />
 
-                <section v-if="recommendedImprovements.length" class="max-w-3xl" aria-labelledby="recommended-improvements-heading">
+                <section v-if="recommendedImprovements.length" class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8" aria-labelledby="recommended-improvements-heading">
                     <p class="text-xs font-bold uppercase tracking-wide text-blue-600">Recommended improvements</p>
                     <h2 id="recommended-improvements-heading" class="mt-2 text-2xl font-bold tracking-tight text-slate-950">Start with the changes most likely to clean up returns friction.</h2>
-                    <p class="mt-3 text-sm leading-6 text-slate-600">
+                    <p class="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
                         These are the first moves to discuss with your operations, support, and ecommerce teams. They prioritize practical workflow changes over broad platform replacement, so you can pressure-test the recommendations against your current policy, exchange behavior, and manual workload.
                     </p>
                     <ol class="mt-5 grid gap-3 sm:grid-cols-3">
