@@ -77,8 +77,8 @@ const impactChip = computed(() => {
         class="rounded-3xl border border-blue-100 bg-gradient-to-br from-blue-50 via-white to-white p-6 shadow-sm sm:p-8"
         aria-labelledby="opportunity-hero-heading"
     >
-        <div class="grid gap-8 md:grid-cols-[minmax(0,1fr),minmax(220px,280px)] md:items-center">
-            <div class="min-w-0">
+        <div class="flex flex-col gap-8 md:flex-row md:items-center md:justify-between">
+            <div class="min-w-0 md:max-w-[720px] md:flex-1">
                 <p class="inline-flex items-center rounded-full border border-blue-200 bg-blue-100 px-3 py-1 text-xs font-bold uppercase tracking-wide text-blue-700">
                     <span aria-hidden="true">⚡</span>
                     <span class="ml-1">Recommended switch</span>
@@ -111,11 +111,11 @@ const impactChip = computed(() => {
                 </p>
             </div>
 
-            <div class="flex flex-col items-center justify-center gap-3 text-center">
+            <div class="flex w-full shrink-0 flex-col items-center justify-center gap-3 text-center md:w-[260px]">
                 <button
                     type="button"
                     data-testid="sales-contact-link"
-                    class="inline-flex items-center justify-center rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
+                    class="inline-flex max-w-full items-center justify-center rounded-xl bg-blue-600 px-5 py-2.5 text-center text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
                     @click="$emit('contact-sales')"
                 >
                     Talk to the team
