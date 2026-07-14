@@ -26,7 +26,14 @@ class WebsiteCrawler
                 'html' => $response->body(),
             ];
 
-            foreach ($this->candidateUrls($url, $response->body()) as $candidateUrl) {
+            $candidateUrls = collect($this->candidateUrls($url, $response->body()))
+                ->merge($this->sitemapCandidateUrls($url))
+                ->unique()
+                ->sortBy(fn (string $candidateUrl): int => $this->candidatePriority($candidateUrl))
+                ->values()
+                ->all();
+
+            foreach ($candidateUrls as $candidateUrl) {
                 if (count($pages) >= self::MAX_PAGES) {
                     break;
                 }
@@ -76,14 +83,29 @@ class WebsiteCrawler
         }
 
         preg_match_all('/<a\s+[^>]*href=["\']([^"\']+)["\']/i', $html, $matches);
+        preg_match_all('/(?:window\.)?location(?:\.href)?\s*=\s*["\']([^"\']+)["\']/i', $html, $scriptRedirects);
+        preg_match_all('/<meta[^>]+http-equiv=["\']refresh["\'][^>]+content=["\'][^"\']*url=([^"\']+)["\']/i', $html, $metaRedirects);
 
-        return collect($matches[1] ?? [])
+        $redirectUrls = collect($scriptRedirects[1] ?? [])
+            ->merge($metaRedirects[1] ?? [])
+            ->map(fn (string $href): ?string => $this->absoluteUrl($href, $scheme, $host))
+            ->filter()
+            ->filter(fn (string $candidateUrl): bool => $this->isSameHost($candidateUrl, $host))
+            ->unique()
+            ->values();
+
+        $linkUrls = collect($matches[1] ?? [])
             ->map(fn (string $href): ?string => $this->absoluteUrl($href, $scheme, $host))
             ->filter()
             ->filter(fn (string $candidateUrl): bool => $this->isSameHost($candidateUrl, $host))
             ->unique()
             ->filter(fn (string $candidateUrl): bool => $this->isUsefulCandidate($candidateUrl))
             ->sortBy(fn (string $candidateUrl): int => $this->candidatePriority($candidateUrl))
+            ->values();
+
+        return $redirectUrls
+            ->merge($linkUrls)
+            ->unique()
             ->values()
             ->all();
     }
@@ -105,6 +127,71 @@ class WebsiteCrawler
             'faq',
             'about',
         ]);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function sitemapCandidateUrls(string $baseUrl): array
+    {
+        $base = parse_url($baseUrl);
+        $scheme = $base['scheme'] ?? 'https';
+        $host = $base['host'] ?? null;
+
+        if (! $host) {
+            return [];
+        }
+
+        return collect($this->sitemapUrls($scheme, $host))
+            ->flatMap(fn (string $sitemapUrl): array => $this->urlsFromSitemap($sitemapUrl, $host))
+            ->filter(fn (string $candidateUrl): bool => $this->isSameHost($candidateUrl, $host))
+            ->filter(fn (string $candidateUrl): bool => $this->isUsefulCandidate($candidateUrl))
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function sitemapUrls(string $scheme, string $host): array
+    {
+        $defaultSitemap = $scheme.'://'.$host.'/sitemap.xml';
+        $robotsUrl = $scheme.'://'.$host.'/robots.txt';
+        $robotsResponse = $this->fetch($robotsUrl);
+
+        if (! $robotsResponse?->successful()) {
+            return [$defaultSitemap];
+        }
+
+        preg_match_all('/^\s*Sitemap:\s*(\S+)\s*$/mi', $robotsResponse->body(), $matches);
+
+        return collect($matches[1] ?? [])
+            ->filter(fn (string $url): bool => $this->isSameHost($url, $host))
+            ->push($defaultSitemap)
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function urlsFromSitemap(string $sitemapUrl, string $host): array
+    {
+        $response = $this->fetch($sitemapUrl);
+
+        if (! $response?->successful()) {
+            return [];
+        }
+
+        preg_match_all('/<loc>\s*([^<]+)\s*<\/loc>/i', $response->body(), $matches);
+
+        return collect($matches[1] ?? [])
+            ->map(fn (string $url): string => html_entity_decode(trim($url), ENT_QUOTES | ENT_HTML5, 'UTF-8'))
+            ->filter(fn (string $url): bool => $this->isSameHost($url, $host))
+            ->values()
+            ->all();
     }
 
     private function candidatePriority(string $url): int

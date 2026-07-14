@@ -88,6 +88,20 @@ class RulesWebsiteExtractionStrategyTest extends TestCase
         $this->assertStringContainsString('Parts@FarmTractorRepair.com', $byKey['business.contact_email']['evidence_snippet']);
     }
 
+    public function test_derives_low_confidence_company_name_from_domain_when_page_has_no_title(): void
+    {
+        $suggestions = (new RulesWebsiteExtractionStrategy())->extract(new WebsiteScanResult(
+            url: 'https://faithology.com',
+            pages: [['url' => 'https://faithology.com/lander', 'html' => '<html><body><div id="root"></div></body></html>']],
+        ));
+
+        $byKey = collect($suggestions)->keyBy('question_key');
+
+        $this->assertSame('Faithology', $byKey['business.company_name']['value']);
+        $this->assertSame('low', $byKey['business.company_name']['confidence']);
+        $this->assertSame('domain_name_fallback', $byKey['business.company_name']['metadata']['rule']);
+    }
+
     public function test_strips_leading_phone_number_from_contact_email_match(): void
     {
         $html = <<<'HTML'

@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
 import axios from 'axios';
+import { router } from '@inertiajs/vue3';
 import Wizard from '../Wizard.vue';
 
 // The wizard talks to the assessment + import HTTP surface through axios. We
@@ -13,6 +14,18 @@ vi.mock('axios', () => ({
         get: vi.fn(),
     },
 }));
+
+// A successful submit navigates straight to the report page (router.visit)
+// rather than rendering anything inline; mock just router.visit so tests
+// don't attempt a real navigation, while Link keeps its real behavior.
+vi.mock('@inertiajs/vue3', async (importOriginal) => {
+    const actual = await importOriginal();
+
+    return {
+        ...actual,
+        router: { visit: vi.fn() },
+    };
+});
 
 const catalog = [
     {
@@ -56,7 +69,6 @@ let wrapper;
 function mountWizard() {
     wrapper = mount(Wizard, {
         props: { catalog },
-        global: { stubs: { AssessmentResults: true } },
         attachTo: document.body,
     });
 
@@ -145,12 +157,26 @@ const csvFile = () => new File(['handle,title\nabc,Tee'], 'products.csv', { type
 beforeEach(() => {
     axios.post.mockReset();
     axios.get.mockReset();
+    router.visit.mockReset();
     stubHappyPath();
 });
 
 afterEach(() => {
     wrapper?.unmount();
     vi.useRealTimers();
+});
+
+describe('Wizard submit', () => {
+    it('navigates straight to the report page instead of rendering a post-submit summary', async () => {
+        mountWizard();
+        await reachImportStep();
+
+        await wrapper.get('[data-testid="skip-import"]').trigger('click');
+        await flushPromises();
+
+        expect(router.visit).toHaveBeenCalledWith('/reports/tok');
+        expect(wrapper.find('[data-testid="executive-perspective"]').exists()).toBe(false);
+    });
 });
 
 describe('Wizard import step — reaching it', () => {
@@ -190,7 +216,6 @@ describe('Wizard draft resume', () => {
                     merchant: { website: 'https://resume.test' },
                 },
             },
-            global: { stubs: { AssessmentResults: true } },
             attachTo: document.body,
         });
 
@@ -346,6 +371,96 @@ describe('Wizard website scan', () => {
         await flushPromises();
 
         expect(emailInput.element.value).toBe('');
+    });
+
+    it('shows an AI-assisted badge and evidence url for LLM-sourced evidence', async () => {
+        axios.post.mockImplementation((url, body) => {
+            if (url === '/api/assessments') {
+                return Promise.resolve({ data: { assessment: { id: 42 } } });
+            }
+            if (url.endsWith('/website-scan')) {
+                return Promise.resolve({
+                    data: {
+                        evidence: {
+                            'business.company_name': [
+                                {
+                                    source_label: 'Website scan — AI-assisted',
+                                    provider: 'groq',
+                                    value: 'Example Co',
+                                    evidence_snippet: 'Example Co is a returns-first brand.',
+                                    evidence_url: 'https://example.test/about',
+                                    requires_confirmation: false,
+                                },
+                            ],
+                        },
+                        answers: [],
+                        merchant: { website: body.url },
+                    },
+                });
+            }
+
+            return Promise.resolve({ data: {} });
+        });
+
+        mountWizard();
+        await wrapper.get('input[type="url"]').setValue('example.test');
+        await wrapper.get('[data-testid="scan-website"]').trigger('click');
+        await flushPromises();
+        await openManualAnswers();
+
+        expect(wrapper.text()).toContain('Suggested from Website scan — AI-assisted: Example Co');
+        expect(wrapper.text()).toContain('AI-assisted');
+        expect(wrapper.text()).toContain('https://example.test/about');
+        expect(wrapper.text()).not.toContain('Requires confirmation');
+    });
+
+    it('shows both candidates and a confirmation prompt when rules and the LLM disagree', async () => {
+        axios.post.mockImplementation((url, body) => {
+            if (url === '/api/assessments') {
+                return Promise.resolve({ data: { assessment: { id: 42 } } });
+            }
+            if (url.endsWith('/website-scan')) {
+                return Promise.resolve({
+                    data: {
+                        evidence: {
+                            'business.company_name': [
+                                {
+                                    source_label: 'Website scan',
+                                    provider: 'rules',
+                                    value: 'Example Co',
+                                    evidence_snippet: 'Example Co Ltd.',
+                                    evidence_url: 'https://example.test',
+                                    requires_confirmation: true,
+                                },
+                                {
+                                    source_label: 'Website scan — AI-assisted',
+                                    provider: 'groq',
+                                    value: 'Example Company',
+                                    evidence_snippet: 'Example Company, est. 2010.',
+                                    evidence_url: 'https://example.test/about',
+                                    requires_confirmation: true,
+                                },
+                            ],
+                        },
+                        answers: [],
+                        merchant: { website: body.url },
+                    },
+                });
+            }
+
+            return Promise.resolve({ data: {} });
+        });
+
+        mountWizard();
+        await wrapper.get('input[type="url"]').setValue('example.test');
+        await wrapper.get('[data-testid="scan-website"]').trigger('click');
+        await flushPromises();
+        await openManualAnswers();
+
+        expect(wrapper.text()).toContain('Suggested from Website scan: Example Co');
+        expect(wrapper.text()).toContain('Suggested from Website scan — AI-assisted: Example Company');
+        expect(wrapper.text()).toContain('disagree here');
+        expect(wrapper.findAll('*').filter((node) => node.text() === 'Requires confirmation')).toHaveLength(2);
     });
 });
 
@@ -933,6 +1048,7 @@ describe('Wizard import step — skip / continue manually', () => {
         await flushPromises();
 
         expect(postCallsEndingWith('/submit')).toHaveLength(1);
+        expect(router.visit).toHaveBeenCalledWith('/reports/tok');
         expect(postCallsEndingWith('/imports')).toHaveLength(0);
     });
 

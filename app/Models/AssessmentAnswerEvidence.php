@@ -19,7 +19,11 @@ class AssessmentAnswerEvidence extends Model
         'question_key',
         'source_type',
         'source_label',
+        'provider',
+        'model',
+        'prompt_version',
         'confidence',
+        'requires_confirmation',
         'value',
         'evidence_url',
         'evidence_snippet',
@@ -33,6 +37,7 @@ class AssessmentAnswerEvidence extends Model
         return [
             'value' => 'array',
             'metadata' => 'array',
+            'requires_confirmation' => 'boolean',
             'observed_period_start' => 'date',
             'observed_period_end' => 'date',
         ];

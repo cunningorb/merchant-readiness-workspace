@@ -305,4 +305,47 @@ describe('Reports/Show', () => {
         const dialog = wrapper.get('[role="dialog"]');
         expect(dialog.text()).toContain('Annual order volume x estimated return rate x average order value.');
     });
+
+    it('shows the executive perspective below the primary recommendation when present', () => {
+        wrapper = mount(Show, {
+            props: {
+                report: {
+                    ...report,
+                    aiInsight: {
+                        headline: 'Exchanges are quietly costing you revenue',
+                        executive_summary: 'You rarely offer exchanges, which pushes customers toward refunds.',
+                        merchant_context: 'A mid-size apparel seller.',
+                        business_reasoning: 'Exchange-first flows keep the sale instead of losing it to a refund.',
+                        priority_reason: 'Highest-confidence opportunity identified.',
+                        implementation_notes: 'Default eligible returns into an exchange flow at checkout.',
+                        confidence: 'high',
+                        disclaimer: 'Estimate based on your answers — not a promise of results.',
+                    },
+                },
+                catalog,
+            },
+            attachTo: document.body,
+        });
+
+        const insight = wrapper.get('[data-testid="executive-perspective"]');
+        expect(insight.text()).toContain('Executive Perspective');
+        expect(insight.text()).toContain('Exchanges are quietly costing you revenue');
+        expect(insight.text()).toContain('Exchange-first flows keep the sale instead of losing it to a refund.');
+        expect(insight.text()).toContain('Default eligible returns into an exchange flow at checkout.');
+        expect(insight.text()).toContain('AI Powered');
+        expect(insight.text()).toContain('Generated from your assessment data and publicly available business information');
+
+        const html = wrapper.html();
+        const heroIndex = html.indexOf('data-testid="opportunity-hero"');
+        const primaryCardIndex = html.indexOf('data-testid="recommendation-card"');
+        const insightIndex = html.indexOf('data-testid="executive-perspective"');
+        expect(insightIndex).toBeGreaterThan(heroIndex);
+        expect(insightIndex).toBeLessThan(primaryCardIndex);
+    });
+
+    it('hides the executive perspective entirely when the report has no insight', () => {
+        const wrapper = mountShow();
+
+        expect(wrapper.find('[data-testid="executive-perspective"]').exists()).toBe(false);
+    });
 });

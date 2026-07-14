@@ -3,6 +3,7 @@ import { computed, ref } from 'vue';
 import axios from 'axios';
 import CapabilityAndImprovements from '../../Components/Report/CapabilityAndImprovements.vue';
 import CalculationModal from '../../Components/Report/CalculationModal.vue';
+import ExecutivePerspective from '../../Components/Report/ExecutivePerspective.vue';
 import ExecutiveSummaryCard from '../../Components/Report/ExecutiveSummaryCard.vue';
 import OpportunityHero from '../../Components/Report/OpportunityHero.vue';
 import RecommendationCard from '../../Components/Report/RecommendationCard.vue';
@@ -87,6 +88,7 @@ const fallbackRecommendations = computed(() => {
 });
 const displayTopRecommendations = computed(() => [...(props.report.topRecommendations ?? []), ...fallbackRecommendations.value].slice(0, 3));
 const primaryDisplayRecommendation = computed(() => displayTopRecommendations.value[0] ?? null);
+const aiInsight = computed(() => props.report.aiInsight ?? null);
 const secondaryRecommendations = computed(() => displayTopRecommendations.value.slice(1));
 const remainingRecommendations = computed(() => props.report.remainingRecommendations ?? []);
 const allRecommendations = computed(() => [
@@ -159,6 +161,11 @@ function printReport() {
                     @contact-sales="openSalesContact"
                 />
 
+                <div class="grid gap-6" :class="aiInsight ? 'lg:grid-cols-2' : ''">
+                    <ExecutivePerspective v-if="aiInsight" :insight="aiInsight" />
+                    <ExecutiveSummaryCard :report="report" />
+                </div>
+
                 <section v-if="recommendedImprovements.length" class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8" aria-labelledby="recommended-improvements-heading">
                     <p class="text-xs font-bold uppercase tracking-wide text-blue-600">Recommended improvements</p>
                     <h2 id="recommended-improvements-heading" class="mt-2 text-2xl font-bold tracking-tight text-slate-950">Start with the changes most likely to clean up returns friction.</h2>
@@ -172,8 +179,6 @@ function printReport() {
                         </li>
                     </ol>
                 </section>
-
-                <ExecutiveSummaryCard :report="report" />
 
                 <ScoreBreakdownCard :assessment="report.assessment" />
 

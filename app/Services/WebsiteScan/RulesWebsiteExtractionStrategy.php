@@ -15,14 +15,14 @@ class RulesWebsiteExtractionStrategy implements WebsiteExtractionStrategy
             $html = $page['html'];
             $text = $this->plainText($html);
 
-            if ($companyName = $this->companyName($html)) {
+            if ($companyName = $this->companyName($html, $page['url'])) {
                 $suggestions[] = $this->suggestion(
                     questionKey: 'business.company_name',
-                    value: $companyName,
-                    confidence: 'medium',
+                    value: $companyName['value'],
+                    confidence: $companyName['confidence'],
                     url: $page['url'],
-                    snippet: $companyName,
-                    metadata: ['rule' => 'html_title_or_meta']
+                    snippet: $companyName['snippet'],
+                    metadata: ['rule' => $companyName['rule']]
                 );
             }
 
@@ -129,17 +129,56 @@ class RulesWebsiteExtractionStrategy implements WebsiteExtractionStrategy
         return $this->cleanText(strip_tags($html));
     }
 
-    private function companyName(string $html): ?string
+    /**
+     * @return array{value: string, confidence: string, snippet: string, rule: string}|null
+     */
+    private function companyName(string $html, string $url): ?array
     {
         if (preg_match('/<meta[^>]+property=["\']og:site_name["\'][^>]+content=["\']([^"\']+)["\']/i', $html, $match)) {
-            return $this->cleanText($match[1]);
+            $value = $this->cleanText($match[1]);
+
+            return ['value' => $value, 'confidence' => 'medium', 'snippet' => $value, 'rule' => 'html_meta_site_name'];
         }
 
         if (preg_match('/<title[^>]*>(.*?)<\/title>/is', $html, $match)) {
-            return $this->cleanText(Str::before(strip_tags($match[1]), '|'));
+            $value = $this->cleanText(Str::before(strip_tags($match[1]), '|'));
+
+            if ($value !== '') {
+                return ['value' => $value, 'confidence' => 'medium', 'snippet' => $value, 'rule' => 'html_title'];
+            }
+        }
+
+        if ($domainName = $this->companyNameFromDomain($url)) {
+            return [
+                'value' => $domainName,
+                'confidence' => 'low',
+                'snippet' => "Derived from website domain {$this->hostForSnippet($url)}.",
+                'rule' => 'domain_name_fallback',
+            ];
         }
 
         return null;
+    }
+
+    private function companyNameFromDomain(string $url): ?string
+    {
+        $host = $this->hostForSnippet($url);
+
+        if ($host === '') {
+            return null;
+        }
+
+        $host = preg_replace('/^www\./i', '', $host) ?? $host;
+        $name = Str::before($host, '.');
+        $name = str_replace(['-', '_'], ' ', $name);
+        $name = $this->cleanText($name);
+
+        return $name === '' ? null : Str::title($name);
+    }
+
+    private function hostForSnippet(string $url): string
+    {
+        return strtolower(parse_url($url, PHP_URL_HOST) ?? '');
     }
 
     private function platform(string $html): ?string

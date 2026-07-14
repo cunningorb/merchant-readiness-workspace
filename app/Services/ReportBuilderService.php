@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Contracts\RecommendationInsightGenerator;
 use App\Models\Assessment;
 use App\Models\AssessmentBenchmarkComparison;
 use App\Models\AssessmentOpportunity;
@@ -9,6 +10,7 @@ use App\Models\Recommendation;
 use App\Models\Report;
 use App\Services\Opportunities\OpportunityRankingService;
 use Illuminate\Support\Collection;
+use Throwable;
 
 class ReportBuilderService
 {
@@ -38,6 +40,7 @@ class ReportBuilderService
 
     public function __construct(
         private readonly OpportunityRankingService $ranking,
+        private readonly RecommendationInsightGenerator $insightGenerator,
     ) {}
 
     public function createForAssessment(Assessment $assessment): Report
@@ -47,7 +50,12 @@ class ReportBuilderService
         ]);
     }
 
-    public function buildPayload(Report $report): array
+    /**
+     * $includeInsight exists so callers that don't display the report (e.g.
+     * the "notify sales" contact endpoint, which only needs merchant/url)
+     * don't pay for LLM generation latency they'll never use.
+     */
+    public function buildPayload(Report $report, bool $includeInsight = true): array
     {
         $assessment = $report->assessment;
         $assessment->loadMissing(['recommendations', 'merchant', 'answers', 'opportunities', 'benchmarkComparisons']);
@@ -87,7 +95,27 @@ class ReportBuilderService
             'actionPlan' => $this->actionPlan($rankedRecommendations),
             'peerComparisons' => $this->peerComparisons($assessment->benchmarkComparisons),
             'talkingPoints' => $this->talkingPoints($rankedRecommendations),
+            'aiInsight' => $includeInsight ? $this->aiInsight($assessment, $rankedRecommendations->first()) : null,
         ];
+    }
+
+    /**
+     * Never lets AI-insight generation fail the report. RecommendationInsightService
+     * already returns null (rather than throwing) on any provider issue; this
+     * catch is defense in depth in case that contract is ever violated by a
+     * future implementation.
+     */
+    private function aiInsight(Assessment $assessment, ?Recommendation $topRecommendation): ?array
+    {
+        if ($topRecommendation === null) {
+            return null;
+        }
+
+        try {
+            return $this->insightGenerator->generate($assessment, $topRecommendation)?->toArray();
+        } catch (Throwable) {
+            return null;
+        }
     }
 
     private function merchantProfile(Assessment $assessment): array

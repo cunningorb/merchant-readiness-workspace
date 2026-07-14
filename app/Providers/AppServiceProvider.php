@@ -3,6 +3,10 @@
 namespace App\Providers;
 
 use App\Contracts\AssessmentScorer;
+use App\Contracts\RecommendationInsightGenerator;
+use App\Services\Ai\RecommendationInsightService;
+use App\Services\Llm\GroqLlmClient;
+use App\Services\Llm\LlmClient;
 use App\Services\Imports\Csv\CsvCatalogImporter;
 use App\Services\Imports\Csv\CsvInventoryImporter;
 use App\Services\Imports\Csv\CsvOrderReturnImporter;
@@ -47,6 +51,15 @@ class AppServiceProvider extends ServiceProvider
         // registration (from later tasks' service providers) is visible to the
         // jobs that consume it.
         $this->app->singleton(ImportProviderRegistry::class);
+
+        // Only Groq is implemented today; the match is the seam for a future
+        // OpenRouter/Gemini client keyed off the same llm.provider config.
+        $this->app->bind(LlmClient::class, fn ($app) => match (config('llm.provider', 'groq')) {
+            'groq' => $app->make(GroqLlmClient::class),
+            default => $app->make(GroqLlmClient::class),
+        });
+
+        $this->app->bind(RecommendationInsightGenerator::class, RecommendationInsightService::class);
     }
 
     /**
