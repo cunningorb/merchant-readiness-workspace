@@ -28,6 +28,11 @@
         <env name="DB_URL" value=""/>
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
+        <!-- Never let real GROQ_API_KEY/LLM_ENABLED from a developer's .env
+             leak into the suite: any test that needs the LLM path must
+             opt in explicitly with config(['llm.enabled' => true, ...])
+             and Http::fake(), same as the existing website-scan LLM tests. -->
+        <env name="LLM_ENABLED" value="false"/>
         <env name="SESSION_DRIVER" value="array"/>
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>

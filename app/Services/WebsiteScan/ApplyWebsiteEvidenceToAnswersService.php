@@ -60,6 +60,7 @@ class ApplyWebsiteEvidenceToAnswersService
 
         $evidence
             ->filter(fn (AssessmentAnswerEvidence $record): bool => ! in_array($record->question_key, $existingAnswerKeys, true))
+            ->filter(fn (AssessmentAnswerEvidence $record): bool => ! $record->requires_confirmation)
             ->unique('question_key')
             ->each(function (AssessmentAnswerEvidence $record) use ($assessment): void {
                 $question = $this->catalog->question($record->question_key);

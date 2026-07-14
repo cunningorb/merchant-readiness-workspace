@@ -3,6 +3,7 @@ import { computed, ref } from 'vue';
 import axios from 'axios';
 import CapabilityAndImprovements from '../../Components/Report/CapabilityAndImprovements.vue';
 import CalculationModal from '../../Components/Report/CalculationModal.vue';
+import ExecutivePerspective from '../../Components/Report/ExecutivePerspective.vue';
 import ExecutiveSummaryCard from '../../Components/Report/ExecutiveSummaryCard.vue';
 import OpportunityHero from '../../Components/Report/OpportunityHero.vue';
 import RecommendationCard from '../../Components/Report/RecommendationCard.vue';
@@ -87,6 +88,7 @@ const fallbackRecommendations = computed(() => {
 });
 const displayTopRecommendations = computed(() => [...(props.report.topRecommendations ?? []), ...fallbackRecommendations.value].slice(0, 3));
 const primaryDisplayRecommendation = computed(() => displayTopRecommendations.value[0] ?? null);
+const aiInsight = computed(() => props.report.aiInsight ?? null);
 const secondaryRecommendations = computed(() => displayTopRecommendations.value.slice(1));
 const remainingRecommendations = computed(() => props.report.remainingRecommendations ?? []);
 const allRecommendations = computed(() => [
@@ -193,6 +195,7 @@ function printReport() {
                         @see-calculation="openCalculation(primaryDisplayRecommendation.opportunity_type)"
                         @contact-sales="openSalesContact"
                     />
+                    <ExecutivePerspective v-if="aiInsight" :insight="aiInsight" />
                     <div v-if="secondaryRecommendations.length" class="mt-4 grid gap-4 sm:grid-cols-2">
                         <RecommendationCard
                             v-for="(recommendation, index) in secondaryRecommendations"

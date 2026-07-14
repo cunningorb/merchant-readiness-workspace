@@ -11,7 +11,7 @@ class WebsiteScanController extends Controller
 {
     public function store(StartWebsiteScanRequest $request, Assessment $assessment, StartWebsiteScanService $service): JsonResponse
     {
-        $scan = $service->start($assessment, $request->validated('url'));
+        $scan = $service->start($assessment, $request->validated('url'), $request->ip());
         $assessment->load(['answerEvidence', 'answers']);
 
         return response()->json([
@@ -28,7 +28,10 @@ class WebsiteScanController extends Controller
                     'question_key' => $record->question_key,
                     'source_type' => $record->source_type,
                     'source_label' => $record->source_label,
+                    'provider' => $record->provider,
+                    'model' => $record->model,
                     'confidence' => $record->confidence,
+                    'requires_confirmation' => $record->requires_confirmation,
                     'value' => $record->value,
                     'evidence_url' => $record->evidence_url,
                     'evidence_snippet' => $record->evidence_snippet,

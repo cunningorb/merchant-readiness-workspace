@@ -347,6 +347,96 @@ describe('Wizard website scan', () => {
 
         expect(emailInput.element.value).toBe('');
     });
+
+    it('shows an AI-assisted badge and evidence url for LLM-sourced evidence', async () => {
+        axios.post.mockImplementation((url, body) => {
+            if (url === '/api/assessments') {
+                return Promise.resolve({ data: { assessment: { id: 42 } } });
+            }
+            if (url.endsWith('/website-scan')) {
+                return Promise.resolve({
+                    data: {
+                        evidence: {
+                            'business.company_name': [
+                                {
+                                    source_label: 'Website scan — AI-assisted',
+                                    provider: 'groq',
+                                    value: 'Example Co',
+                                    evidence_snippet: 'Example Co is a returns-first brand.',
+                                    evidence_url: 'https://example.test/about',
+                                    requires_confirmation: false,
+                                },
+                            ],
+                        },
+                        answers: [],
+                        merchant: { website: body.url },
+                    },
+                });
+            }
+
+            return Promise.resolve({ data: {} });
+        });
+
+        mountWizard();
+        await wrapper.get('input[type="url"]').setValue('example.test');
+        await wrapper.get('[data-testid="scan-website"]').trigger('click');
+        await flushPromises();
+        await openManualAnswers();
+
+        expect(wrapper.text()).toContain('Suggested from Website scan — AI-assisted: Example Co');
+        expect(wrapper.text()).toContain('AI-assisted');
+        expect(wrapper.text()).toContain('https://example.test/about');
+        expect(wrapper.text()).not.toContain('Requires confirmation');
+    });
+
+    it('shows both candidates and a confirmation prompt when rules and the LLM disagree', async () => {
+        axios.post.mockImplementation((url, body) => {
+            if (url === '/api/assessments') {
+                return Promise.resolve({ data: { assessment: { id: 42 } } });
+            }
+            if (url.endsWith('/website-scan')) {
+                return Promise.resolve({
+                    data: {
+                        evidence: {
+                            'business.company_name': [
+                                {
+                                    source_label: 'Website scan',
+                                    provider: 'rules',
+                                    value: 'Example Co',
+                                    evidence_snippet: 'Example Co Ltd.',
+                                    evidence_url: 'https://example.test',
+                                    requires_confirmation: true,
+                                },
+                                {
+                                    source_label: 'Website scan — AI-assisted',
+                                    provider: 'groq',
+                                    value: 'Example Company',
+                                    evidence_snippet: 'Example Company, est. 2010.',
+                                    evidence_url: 'https://example.test/about',
+                                    requires_confirmation: true,
+                                },
+                            ],
+                        },
+                        answers: [],
+                        merchant: { website: body.url },
+                    },
+                });
+            }
+
+            return Promise.resolve({ data: {} });
+        });
+
+        mountWizard();
+        await wrapper.get('input[type="url"]').setValue('example.test');
+        await wrapper.get('[data-testid="scan-website"]').trigger('click');
+        await flushPromises();
+        await openManualAnswers();
+
+        expect(wrapper.text()).toContain('Suggested from Website scan: Example Co');
+        expect(wrapper.text()).toContain('Suggested from Website scan — AI-assisted: Example Company');
+        expect(wrapper.text()).toContain('disagree here');
+        expect(wrapper.findAll('*').filter((node) => node.text() === 'Requires confirmation')).toHaveLength(2);
+    });
 });
 
 describe('Wizard assisted grouping', () => {

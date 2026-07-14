@@ -35,7 +35,7 @@ class ReportController extends Controller
     {
         abort_if($report->published_at === null, 404);
 
-        $payload = $service->buildPayload($report);
+        $payload = $service->buildPayload($report, includeInsight: false);
 
         try {
             Mail::to('micah@normalview.pro')->send(new ReportContactRequested(

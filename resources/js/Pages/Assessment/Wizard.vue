@@ -25,6 +25,12 @@ const DEMO_SCENARIOS = [
     { key: 'home_goods', label: 'Home-goods small merchant' },
 ];
 
+// The scan itself is one synchronous request/response (see
+// StartWebsiteScanService), so there's no real per-phase signal from the
+// backend to poll — this is a client-side approximation of progress, not a
+// literal trace of server-side steps.
+const SCAN_PHASES = ['Crawling site', 'Applying rules', 'Clarifying ambiguous values', 'Verifying evidence'];
+
 const WEBSITE_SCAN_QUESTION_KEYS = [
     'business.company_name',
     'business.contact_email',
@@ -110,6 +116,9 @@ const websiteUrl = ref(props.initialAssessment?.merchant?.website ?? '');
 const websiteScanState = ref('idle');
 const websiteScanError = ref(null);
 const websiteEvidence = ref(props.initialAssessment?.evidence ?? {});
+const scanPhaseIndex = ref(0);
+const scanPhaseLabel = computed(() => SCAN_PHASES[Math.min(scanPhaseIndex.value, SCAN_PHASES.length - 1)]);
+let scanPhaseTimer = null;
 
 // Explicit three-phase model. 'results' is reached only as a side effect of a
 // successful submitAssessment() (see the submitResult watcher below), so this
@@ -232,6 +241,7 @@ onMounted(() => {
 // once leaked; clear it on unmount so no request fires after the component dies.
 onUnmounted(() => {
     stopPolling();
+    clearInterval(scanPhaseTimer);
 });
 
 // Results are shown whenever submitResult is set. Keep the explicit phase in
@@ -271,6 +281,14 @@ function questionError(question, index) {
 
 function evidenceForQuestion(questionKey) {
     return websiteEvidence.value[questionKey]?.[0] ?? null;
+}
+
+function evidenceCandidatesForQuestion(questionKey) {
+    return websiteEvidence.value[questionKey] ?? [];
+}
+
+function hasUnresolvedConflict(questionKey) {
+    return evidenceCandidatesForQuestion(questionKey).some((record) => record.requires_confirmation);
 }
 
 function isAnswered(value) {
@@ -424,6 +442,13 @@ function previousSection() {
 async function scanWebsite() {
     websiteScanError.value = null;
     websiteScanState.value = 'scanning';
+    scanPhaseIndex.value = 0;
+    clearInterval(scanPhaseTimer);
+    scanPhaseTimer = setInterval(() => {
+        if (scanPhaseIndex.value < SCAN_PHASES.length - 1) {
+            scanPhaseIndex.value += 1;
+        }
+    }, 900);
 
     try {
         await startAssessment();
@@ -446,12 +471,16 @@ async function scanWebsite() {
             answers.value[answer.question_key] = answer.value;
         });
 
+        scanPhaseIndex.value = SCAN_PHASES.length - 1;
         websiteScanState.value = 'done';
         updateManualPromptAfterAssistedFill();
         status.value = 'Website scan applied where answers were blank.';
     } catch (error) {
         websiteScanState.value = 'error';
         websiteScanError.value = error.response?.data?.message ?? 'We could not scan that site. Check the URL and try again.';
+    } finally {
+        clearInterval(scanPhaseTimer);
+        scanPhaseTimer = null;
     }
 }
 
@@ -848,6 +877,7 @@ function importStatusLabel(status) {
                                 {{ websiteScanState === 'scanning' ? 'Scanning...' : currentStep.websiteScanButton }}
                             </button>
                         </div>
+                        <p v-if="websiteScanState === 'scanning'" class="mt-3 text-sm font-medium text-blue-700" role="status" aria-live="polite">{{ scanPhaseLabel }}&hellip;</p>
                         <p v-if="websiteScanError" class="mt-3 text-sm text-red-600" role="alert">{{ websiteScanError }}</p>
                         <p v-else-if="websiteScanState === 'done'" class="mt-3 text-sm font-medium text-blue-800">Scan complete. Suggested answers were added only where blanks existed.</p>
                     </div>
@@ -934,10 +964,36 @@ function importStatusLabel(status) {
                                 <span v-if="question.required" class="text-blue-600">*</span>
                             </span>
 
-                            <p v-if="evidenceForQuestion(question.key)" class="mb-2 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-800">
-                                Suggested from {{ evidenceForQuestion(question.key).source_label }}: {{ evidenceForQuestion(question.key).value }}
-                                <span v-if="evidenceForQuestion(question.key).evidence_snippet" class="mt-1 block text-blue-700">"{{ evidenceForQuestion(question.key).evidence_snippet }}"</span>
-                            </p>
+                            <div v-if="evidenceForQuestion(question.key)" class="mb-2 space-y-2">
+                                <div
+                                    v-for="(record, recordIndex) in (hasUnresolvedConflict(question.key) ? evidenceCandidatesForQuestion(question.key) : [evidenceForQuestion(question.key)])"
+                                    :key="recordIndex"
+                                    class="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-800"
+                                >
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <span>Suggested from {{ record.source_label }}: {{ record.value }}</span>
+                                        <span
+                                            v-if="record.provider === 'groq'"
+                                            class="inline-flex items-center rounded-full bg-blue-200 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-blue-900"
+                                        >AI-assisted</span>
+                                        <span
+                                            v-if="record.requires_confirmation"
+                                            class="inline-flex items-center rounded-full bg-amber-200 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-900"
+                                        >Requires confirmation</span>
+                                    </div>
+                                    <span v-if="record.evidence_snippet" class="mt-1 block text-blue-700">"{{ record.evidence_snippet }}"</span>
+                                    <a
+                                        v-if="record.evidence_url"
+                                        :href="record.evidence_url"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        class="mt-1 block truncate text-blue-600 underline"
+                                    >{{ record.evidence_url }}</a>
+                                </div>
+                                <p v-if="hasUnresolvedConflict(question.key)" class="text-xs text-amber-700">
+                                    The rules scan and the AI-assisted scan disagree here — pick the correct answer below.
+                                </p>
+                            </div>
 
                             <input
                                 v-if="['text', 'email'].includes(question.type)"

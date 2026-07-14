@@ -5,6 +5,7 @@ import { Head } from '@inertiajs/vue3';
 import AuthenticatedLayout from '../../Layouts/AuthenticatedLayout.vue';
 import CapabilityAndImprovements from '../../Components/Report/CapabilityAndImprovements.vue';
 import CalculationModal from '../../Components/Report/CalculationModal.vue';
+import ExecutivePerspective from '../../Components/Report/ExecutivePerspective.vue';
 import ExecutiveSummaryCard from '../../Components/Report/ExecutiveSummaryCard.vue';
 import OpportunityHero from '../../Components/Report/OpportunityHero.vue';
 import RecommendationCard from '../../Components/Report/RecommendationCard.vue';
@@ -202,6 +203,7 @@ function printReport() {
                             @see-calculation="openCalculation(primaryRecommendation.opportunity_type)"
                             @contact-sales="handleSalesContact"
                         />
+                        <ExecutivePerspective v-if="report.aiInsight" :insight="report.aiInsight" />
                         <div v-if="secondaryRecommendations.length" class="mt-4 grid gap-4 sm:grid-cols-2">
                             <RecommendationCard
                                 v-for="(recommendation, index) in secondaryRecommendations"

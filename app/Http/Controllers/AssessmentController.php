@@ -93,7 +93,9 @@ class AssessmentController extends Controller
     ): JsonResponse {
         $assessment = $service->submit($assessment);
         $assessment->load('merchant');
-        $reportPayload = $reports->buildPayload($assessment->report);
+        // Insight generation is skipped here so submit stays fast; the report
+        // page generates (and caches) it on first view instead.
+        $reportPayload = $reports->buildPayload($assessment->report, includeInsight: false);
         $reportEmail->send($assessment);
 
         return response()->json([

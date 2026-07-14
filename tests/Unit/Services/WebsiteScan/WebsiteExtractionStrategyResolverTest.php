@@ -2,6 +2,7 @@
 
 namespace Tests\Unit\Services\WebsiteScan;
 
+use App\Services\WebsiteScan\HybridWebsiteExtractionStrategy;
 use App\Services\WebsiteScan\LlmWebsiteExtractionStrategy;
 use App\Services\WebsiteScan\RulesWebsiteExtractionStrategy;
 use App\Services\WebsiteScan\WebsiteExtractionStrategyResolver;
@@ -25,6 +26,16 @@ class WebsiteExtractionStrategyResolverTest extends TestCase
 
         $this->assertInstanceOf(
             LlmWebsiteExtractionStrategy::class,
+            app(WebsiteExtractionStrategyResolver::class)->resolve()
+        );
+    }
+
+    public function test_can_resolve_hybrid_strategy_without_calling_a_provider(): void
+    {
+        config(['assessment.website_extraction.strategy' => 'hybrid']);
+
+        $this->assertInstanceOf(
+            HybridWebsiteExtractionStrategy::class,
             app(WebsiteExtractionStrategyResolver::class)->resolve()
         );
     }
