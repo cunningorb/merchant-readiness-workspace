@@ -336,9 +336,11 @@ describe('Reports/Show', () => {
         expect(insight.text()).toContain('Generated from your assessment data and publicly available business information');
 
         const html = wrapper.html();
+        const heroIndex = html.indexOf('data-testid="opportunity-hero"');
         const primaryCardIndex = html.indexOf('data-testid="recommendation-card"');
         const insightIndex = html.indexOf('data-testid="executive-perspective"');
-        expect(insightIndex).toBeGreaterThan(primaryCardIndex);
+        expect(insightIndex).toBeGreaterThan(heroIndex);
+        expect(insightIndex).toBeLessThan(primaryCardIndex);
     });
 
     it('hides the executive perspective entirely when the report has no insight', () => {

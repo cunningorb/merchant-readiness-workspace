@@ -1,8 +1,7 @@
 <script setup>
 import axios from 'axios';
-import { Link } from '@inertiajs/vue3';
+import { Link, router } from '@inertiajs/vue3';
 import { computed, onMounted, onUnmounted, ref, watch, watchEffect } from 'vue';
-import AssessmentResults from './AssessmentResults.vue';
 
 const AUTOSAVE_DEBOUNCE_MS = 600;
 const IMPORT_POLL_MS = 1500;
@@ -107,7 +106,6 @@ const assessmentId = ref(props.initialAssessment?.id ?? null);
 const answers = ref(initialAnswers());
 const status = ref('');
 const errors = ref({});
-const submitResult = ref(null);
 const submitError = ref(null);
 const isSubmitting = ref(false);
 const isMounted = ref(false);
@@ -120,9 +118,10 @@ const scanPhaseIndex = ref(0);
 const scanPhaseLabel = computed(() => SCAN_PHASES[Math.min(scanPhaseIndex.value, SCAN_PHASES.length - 1)]);
 let scanPhaseTimer = null;
 
-// Explicit three-phase model. 'results' is reached only as a side effect of a
-// successful submitAssessment() (see the submitResult watcher below), so this
-// task never sets it directly.
+// 'questions' | 'import'. A successful submitAssessment() navigates away to
+// the real report page (router.visit) rather than swapping to a third phase
+// here — the report itself is the post-submit experience, not a page in the
+// wizard.
 const currentPhase = ref('questions');
 
 // Import-step state. All of this is intentionally isolated from the draft state
@@ -180,7 +179,7 @@ const isCsvTerminal = computed(() =>
 const allCsvDataTypesProcessed = computed(() => CSV_DATA_TYPES.every((dataType) =>
     csvFiles.value[dataType.key].state === 'processed',
 ));
-const companyName = computed(() => answers.value['business.company_name'] || submitResult.value?.merchant?.company_name || null);
+const companyName = computed(() => answers.value['business.company_name'] || null);
 const wizardTitle = computed(() => companyName.value
     ? `Evaluate ${companyName.value}'s returns operation.`
     : 'Evaluate your returns operation.');
@@ -242,16 +241,6 @@ onMounted(() => {
 onUnmounted(() => {
     stopPolling();
     clearInterval(scanPhaseTimer);
-});
-
-// Results are shown whenever submitResult is set. Keep the explicit phase in
-// sync (and stop any in-flight poll) rather than driving 'results' by hand from
-// each submit call site.
-watch(submitResult, (value) => {
-    if (value) {
-        stopPolling();
-        currentPhase.value = 'results';
-    }
 });
 
 watch(answers, () => {
@@ -493,8 +482,15 @@ async function submitAssessment() {
         await flushPendingSave();
 
         const response = await axios.post(`/api/assessments/${assessmentId.value}/submit`);
-        submitResult.value = response.data;
+
+        // The report is the post-submit experience — navigate straight to it
+        // rather than rendering a separate summary here. Leave isSubmitting
+        // true through the transition so the button doesn't flash re-enabled.
+        stopPolling();
+        router.visit(response.data.report.url);
     } catch (error) {
+        isSubmitting.value = false;
+
         if (error.response?.status === 409) {
             submitError.value = 'This assessment has already been submitted.';
         } else {
@@ -505,8 +501,6 @@ async function submitAssessment() {
                 ? `Missing required answers in: ${sections.join(', ')}.`
                 : 'Check the highlighted answers before submitting.';
         }
-    } finally {
-        isSubmitting.value = false;
     }
 }
 
@@ -1334,8 +1328,6 @@ function importStatusLabel(status) {
                     </p>
                 </div>
             </template>
-
-            <AssessmentResults v-if="submitResult" :result="submitResult" :catalog="catalog" :report-url="submitResult.report.url" />
         </section>
 
         <footer class="mx-auto mt-12 flex max-w-5xl flex-col gap-3 border-t border-slate-200 pt-6 text-sm text-slate-500 sm:flex-row sm:items-center sm:justify-between">

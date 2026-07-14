@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
 import axios from 'axios';
+import { router } from '@inertiajs/vue3';
 import Wizard from '../Wizard.vue';
 
 // The wizard talks to the assessment + import HTTP surface through axios. We
@@ -13,6 +14,18 @@ vi.mock('axios', () => ({
         get: vi.fn(),
     },
 }));
+
+// A successful submit navigates straight to the report page (router.visit)
+// rather than rendering anything inline; mock just router.visit so tests
+// don't attempt a real navigation, while Link keeps its real behavior.
+vi.mock('@inertiajs/vue3', async (importOriginal) => {
+    const actual = await importOriginal();
+
+    return {
+        ...actual,
+        router: { visit: vi.fn() },
+    };
+});
 
 const catalog = [
     {
@@ -56,7 +69,6 @@ let wrapper;
 function mountWizard() {
     wrapper = mount(Wizard, {
         props: { catalog },
-        global: { stubs: { AssessmentResults: true } },
         attachTo: document.body,
     });
 
@@ -145,12 +157,26 @@ const csvFile = () => new File(['handle,title\nabc,Tee'], 'products.csv', { type
 beforeEach(() => {
     axios.post.mockReset();
     axios.get.mockReset();
+    router.visit.mockReset();
     stubHappyPath();
 });
 
 afterEach(() => {
     wrapper?.unmount();
     vi.useRealTimers();
+});
+
+describe('Wizard submit', () => {
+    it('navigates straight to the report page instead of rendering a post-submit summary', async () => {
+        mountWizard();
+        await reachImportStep();
+
+        await wrapper.get('[data-testid="skip-import"]').trigger('click');
+        await flushPromises();
+
+        expect(router.visit).toHaveBeenCalledWith('/reports/tok');
+        expect(wrapper.find('[data-testid="executive-perspective"]').exists()).toBe(false);
+    });
 });
 
 describe('Wizard import step — reaching it', () => {
@@ -190,7 +216,6 @@ describe('Wizard draft resume', () => {
                     merchant: { website: 'https://resume.test' },
                 },
             },
-            global: { stubs: { AssessmentResults: true } },
             attachTo: document.body,
         });
 
@@ -1023,6 +1048,7 @@ describe('Wizard import step — skip / continue manually', () => {
         await flushPromises();
 
         expect(postCallsEndingWith('/submit')).toHaveLength(1);
+        expect(router.visit).toHaveBeenCalledWith('/reports/tok');
         expect(postCallsEndingWith('/imports')).toHaveLength(0);
     });
 

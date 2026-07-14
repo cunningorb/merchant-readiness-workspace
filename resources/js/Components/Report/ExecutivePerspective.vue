@@ -13,7 +13,7 @@ defineProps({
     <section
         data-testid="executive-perspective"
         aria-labelledby="executive-perspective-heading"
-        class="mt-4 rounded-2xl border border-blue-100 bg-blue-50/60 p-5"
+        class="rounded-3xl border border-blue-100 bg-blue-50/60 p-6 shadow-sm sm:p-8"
     >
         <div class="flex flex-wrap items-center justify-between gap-2">
             <p class="text-xs font-bold uppercase tracking-wide text-blue-600">Executive Perspective</p>

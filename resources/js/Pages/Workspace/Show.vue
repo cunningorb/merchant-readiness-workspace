@@ -170,6 +170,11 @@ function printReport() {
                         @contact-sales="handleSalesContact"
                     />
 
+                    <div class="grid gap-6" :class="report.aiInsight ? 'lg:grid-cols-2' : ''">
+                        <ExecutivePerspective v-if="report.aiInsight" :insight="report.aiInsight" />
+                        <ExecutiveSummaryCard :report="report" />
+                    </div>
+
                     <section v-if="recommendedImprovements.length" class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8" aria-labelledby="recommended-improvements-heading">
                         <p class="text-xs font-bold uppercase tracking-wide text-blue-600">Recommended improvements</p>
                         <h2 id="recommended-improvements-heading" class="mt-2 text-2xl font-bold tracking-tight text-slate-950">Start with the changes most likely to clean up returns friction.</h2>
@@ -184,7 +189,6 @@ function printReport() {
                         </ol>
                     </section>
 
-                    <ExecutiveSummaryCard :report="report" />
                     <ScoreBreakdownCard :assessment="report.assessment" />
 
                     <section aria-labelledby="top-opportunities-heading">
@@ -203,7 +207,6 @@ function printReport() {
                             @see-calculation="openCalculation(primaryRecommendation.opportunity_type)"
                             @contact-sales="handleSalesContact"
                         />
-                        <ExecutivePerspective v-if="report.aiInsight" :insight="report.aiInsight" />
                         <div v-if="secondaryRecommendations.length" class="mt-4 grid gap-4 sm:grid-cols-2">
                             <RecommendationCard
                                 v-for="(recommendation, index) in secondaryRecommendations"
