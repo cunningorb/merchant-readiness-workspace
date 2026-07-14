@@ -110,6 +110,59 @@ class WebsiteScanTest extends TestCase
         );
     }
 
+    public function test_scan_follows_same_host_javascript_redirects(): void
+    {
+        Http::fake([
+            'https://example.com/lander' => Http::response('<html><head><title>Redirected Store</title></head><body>Returns accepted within 30 days.</body></html>'),
+            'https://example.com*' => Http::response('<!DOCTYPE html><html><head><script>window.onload=function(){window.location.href="/lander"}</script></head></html>'),
+        ]);
+        $assessment = Assessment::factory()->create();
+
+        $response = $this->postJson("/api/assessments/{$assessment->id}/website-scan", [
+            'url' => 'example.com',
+        ]);
+
+        $response->assertCreated()
+            ->assertJsonPath('website_scan.pages_scanned', 2);
+
+        $evidence = $response->json('evidence');
+
+        $this->assertSame('Redirected Store', $evidence['business.company_name'][0]['value']);
+        $this->assertSame('15-30 days', $evidence['return_policy.window_days'][0]['value']);
+        $this->assertSame('https://example.com/lander', $evidence['return_policy.window_days'][0]['evidence_url']);
+    }
+
+    public function test_scan_uses_sitemap_when_homepage_is_javascript_shell(): void
+    {
+        Http::fake([
+            'https://example.com/robots.txt' => Http::response("Sitemap: https://example.com/sitemap.xml\n"),
+            'https://example.com/sitemap.xml' => Http::response(<<<'XML'
+                <?xml version="1.0" encoding="UTF-8"?>
+                <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+                    <url><loc>https://example.com/pages/returns</loc></url>
+                    <url><loc>https://example.com/contact</loc></url>
+                </urlset>
+            XML),
+            'https://example.com/pages/returns' => Http::response('<html><body><h1>Returns</h1><p>Returns accepted within 30 days. Exchanges are available.</p></body></html>'),
+            'https://example.com/contact' => Http::response('<html><body>Email support@example.com for help.</body></html>'),
+            'https://example.com*' => Http::response('<html><body><div id="app"></div><script src="/assets/app.js"></script></body></html>'),
+        ]);
+        $assessment = Assessment::factory()->create();
+
+        $response = $this->postJson("/api/assessments/{$assessment->id}/website-scan", [
+            'url' => 'example.com',
+        ]);
+
+        $response->assertCreated()
+            ->assertJsonPath('website_scan.pages_scanned', 3);
+
+        $evidence = $response->json('evidence');
+
+        $this->assertSame('15-30 days', $evidence['return_policy.window_days'][0]['value']);
+        $this->assertSame('support@example.com', $evidence['business.contact_email'][0]['value']);
+        $this->assertSame('https://example.com/pages/returns', $evidence['return_policy.window_days'][0]['evidence_url']);
+    }
+
     public function test_scan_autofill_does_not_replace_existing_answers(): void
     {
         Http::fake([
