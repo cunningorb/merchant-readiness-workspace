@@ -187,6 +187,23 @@ const isCurrentStepComplete = computed(() => missingRequiredStepQuestions.value.
 const shouldShowWebsiteScan = computed(() => currentStep.value.websiteScan
     && !(currentStep.value.hideWebsiteScanWhenComplete && requiredStepQuestions.value.length > 0 && isCurrentStepComplete.value));
 
+function csvUploadButtonLabel(dataTypeKey) {
+    if (csvFiles.value[dataTypeKey].state === 'uploading') {
+        return 'Uploading';
+    }
+
+    if (isCsvUploading.value) {
+        return 'Waiting';
+    }
+
+    return 'Choose file';
+}
+
+function shouldShowCsvUploadSpinner(dataTypeKey) {
+    return csvFiles.value[dataTypeKey].state === 'uploading'
+        || (isCsvUploading.value && csvFiles.value[dataTypeKey].state !== 'processed');
+}
+
 function initialAnswers() {
     const seeded = {};
 
@@ -849,8 +866,12 @@ function importStatusLabel(status) {
                                 <p class="mt-1 text-xs text-slate-500">{{ dataType.hint }}</p>
                                 <p class="mt-1 text-xs text-slate-500">Recommended range: year. Accepted: month, quarter, or year.</p>
 
-                                <label class="mt-3 inline-flex cursor-pointer items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50">
-                                    Choose file
+                                <label
+                                    class="mt-3 inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-semibold shadow-sm transition"
+                                    :class="isCsvProcessing || isCsvUploading ? 'cursor-not-allowed bg-blue-100 text-blue-700 opacity-80' : 'cursor-pointer bg-blue-600 text-white hover:bg-blue-700'"
+                                >
+                                    <span v-if="shouldShowCsvUploadSpinner(dataType.key)" class="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" aria-hidden="true"></span>
+                                    {{ csvUploadButtonLabel(dataType.key) }}
                                     <input
                                         type="file"
                                         accept=".csv"
@@ -1109,8 +1130,12 @@ function importStatusLabel(status) {
                                 <p class="text-sm font-semibold text-slate-900">{{ dataType.label }}</p>
                                 <p class="mt-1 text-xs text-slate-500">{{ dataType.hint }}</p>
 
-                                <label class="mt-3 inline-flex cursor-pointer items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50">
-                                    Choose file
+                                <label
+                                    class="mt-3 inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-semibold shadow-sm transition"
+                                    :class="isCsvProcessing || isCsvUploading ? 'cursor-not-allowed bg-blue-100 text-blue-700 opacity-80' : 'cursor-pointer bg-blue-600 text-white hover:bg-blue-700'"
+                                >
+                                    <span v-if="shouldShowCsvUploadSpinner(dataType.key)" class="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" aria-hidden="true"></span>
+                                    {{ csvUploadButtonLabel(dataType.key) }}
                                     <input
                                         type="file"
                                         accept=".csv"

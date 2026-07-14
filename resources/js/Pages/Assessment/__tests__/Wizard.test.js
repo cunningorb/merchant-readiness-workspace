@@ -538,6 +538,8 @@ describe('Wizard import step — CSV path', () => {
         await flushPromises();
 
         expect(wrapper.get('[data-testid="csv-input-orders_returns"]').attributes('disabled')).toBeDefined();
+        expect(wrapper.text()).toContain('Uploading');
+        expect(wrapper.text()).toContain('Waiting');
 
         resolveUpload({ data: { data_import: { id: 7, status: 'created' } } });
         await upload;
